@@ -29,6 +29,8 @@ URLs may contain a `%s` placeholder that is prompted for at open time
   prompt for the value before opening.
 - **Resizable & draggable** — drag anywhere on the window to move it, drag an
   edge to resize. The size and position are remembered across launches.
+- **Settings** (`⌘,` or the gear icon) — toggle whether search matches URLs, and
+  reset the frecency index.
 - **Read-only** — adding/removing/editing bookmarks stays in the `,bm` script.
 
 ## Keybindings
@@ -41,7 +43,8 @@ URLs may contain a `%s` placeholder that is prompted for at open time
 | `Enter` | open selected in browser |
 | `⌘ Enter` | copy selected URL to clipboard |
 | click | open that row |
-| `Esc` | back out of param mode / quit |
+| `⌘,` | open / close settings |
+| `Esc` | close settings / back out of param mode / quit |
 
 ## Build
 

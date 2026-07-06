@@ -5,10 +5,17 @@ struct PickerView: View {
     @FocusState private var searchFocused: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            searchField
-            Divider()
-            resultsList
+        Group {
+            if state.showSettings {
+                SettingsView(state: state)
+            } else {
+                VStack(spacing: 0) {
+                    searchField
+                    Divider()
+                    resultsList
+                }
+                .onChange(of: state.query) { _ in state.refilter() }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(VisualEffect())
@@ -17,7 +24,6 @@ struct PickerView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
         )
-        .onChange(of: state.query) { _ in state.refilter() }
     }
 
     private var searchField: some View {
@@ -30,6 +36,13 @@ struct PickerView: View {
                 .font(.system(size: 20))
                 .focused($searchFocused)
                 .onAppear { searchFocused = true }
+            Button(action: { state.toggleSettings() }) {
+                Image(systemName: "gearshape")
+                    .foregroundStyle(.secondary)
+                    .font(.system(size: 15))
+            }
+            .buttonStyle(.plain)
+            .help("Settings (⌘,)")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -130,6 +143,61 @@ private struct Row: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(selected ? Color.accentColor : Color.clear)
         )
+    }
+}
+
+private struct SettingsView: View {
+    @ObservedObject var state: AppState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "gearshape")
+                    .foregroundStyle(.secondary)
+                Text("Settings")
+                    .font(.system(size: 18, weight: .semibold))
+                Spacer()
+                Text("⌘,  or  Esc to close")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(16)
+            Divider()
+
+            VStack(alignment: .leading, spacing: 18) {
+                Toggle(isOn: $state.searchInLinks) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Search in links")
+                            .font(.system(size: 14))
+                        Text("Also match the URL, not just title, tags, and aliases")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.switch)
+                .onChange(of: state.searchInLinks) { _ in state.searchInLinksChanged() }
+
+                Divider()
+
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Frecency index")
+                            .font(.system(size: 14))
+                        Text("Usage ranking stored at ~/.local/share/booker/frecency.json")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(action: { state.resetFrecency() }) {
+                        Text(state.frecencyCleared ? "Cleared ✓" : "Reset")
+                    }
+                    .disabled(state.frecencyCleared)
+                }
+            }
+            .padding(16)
+
+            Spacer()
+        }
     }
 }
 

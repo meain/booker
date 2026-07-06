@@ -15,9 +15,23 @@ final class AppState: ObservableObject {
     @Published private(set) var paramMode: Bool = false
     private var pendingBookmark: Bookmark?
 
+    // Settings.
+    @Published var showSettings: Bool = false
+    @Published private(set) var frecencyCleared: Bool = false
+    private static let searchInLinksKey = "searchInLinks"
+    @Published var searchInLinks: Bool {
+        didSet { UserDefaults.standard.set(searchInLinks, forKey: Self.searchInLinksKey) }
+    }
+
     init(initialQuery: String = "") {
         self.bookmarks = BookmarkParser.load()
         self.frecency = Frecency()
+        // Default the link-search toggle to on when unset.
+        let defaults = UserDefaults.standard
+        if defaults.object(forKey: Self.searchInLinksKey) == nil {
+            defaults.set(true, forKey: Self.searchInLinksKey)
+        }
+        self.searchInLinks = defaults.bool(forKey: Self.searchInLinksKey)
         self.query = initialQuery
         refilter()
     }
@@ -34,8 +48,35 @@ final class AppState: ObservableObject {
     /// state mid-view-update and leave the list rendering stale.
     func refilter() {
         guard !paramMode else { return }   // in param mode the query holds the %s value
-        results = Matcher.rank(bookmarks, query: query, frecency: frecency)
+        results = Matcher.rank(bookmarks, query: query, frecency: frecency, searchInLinks: searchInLinks)
         selected = 0
+    }
+
+    // MARK: - Settings
+
+    func toggleSettings() {
+        if showSettings {
+            closeSettings()
+        } else {
+            showSettings = true
+        }
+    }
+
+    func closeSettings() {
+        showSettings = false
+        frecencyCleared = false
+        refilter()   // pick up any changed toggle
+    }
+
+    /// Called when the search-in-links toggle flips (from the view's onChange).
+    func searchInLinksChanged() {
+        refilter()
+    }
+
+    func resetFrecency() {
+        frecency.reset()
+        frecencyCleared = true
+        refilter()
     }
 
     // MARK: - Navigation
@@ -87,9 +128,11 @@ final class AppState: ObservableObject {
         NSApp.terminate(nil)
     }
 
-    /// Escape pressed. Backs out of param mode, or quits.
+    /// Escape pressed. Closes settings, backs out of param mode, or quits.
     func cancel() {
-        if paramMode {
+        if showSettings {
+            closeSettings()
+        } else if paramMode {
             paramMode = false
             pendingBookmark = nil
             query = ""

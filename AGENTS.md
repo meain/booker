@@ -19,9 +19,9 @@ open time. Parser handles all of this — see `Bookmark.swift`.
 
 - `Sources/booker/Bookmark.swift` — markdown parser (greedy metadata split).
 - `Sources/booker/Frecency.swift` — usage store at `~/.local/share/booker/frecency.json` (count + decaying recency).
-- `Sources/booker/Matcher.swift` — fuzzy scorer. General-mode priority bands: **alias > title > tag > url**. `@foo` scopes to aliases, `#foo` to tags.
+- `Sources/booker/Matcher.swift` — fuzzy scorer. General-mode priority bands: **alias > title > tag > url**. `@foo` scopes to aliases, `#foo` to tags. The url band is gated by the `searchInLinks` setting.
 - `Sources/booker/AppState.swift` — query/results/selection + open/copy/`%s`. Refilter is driven from the view's `.onChange`, NOT a `didSet` (mutating published state mid-view-update renders stale).
-- `Sources/booker/PickerView.swift` — SwiftUI UI. Uses a plain `VStack` (not `LazyVStack` — the latter cached stale rows when the result set changed wholesale).
+- `Sources/booker/PickerView.swift` — SwiftUI UI + `SettingsView` (`⌘,`/gear: search-in-links toggle, reset frecency). Uses a plain `VStack` (not `LazyVStack` — the latter cached stale rows when the result set changed wholesale).
 - `Sources/booker/main.swift` — borderless+resizable key window (drag-to-move, edge-resize), key monitor, headless `list`/`rank` modes, `BOOKER_SHOT` render helper. Window frame is persisted via `setFrameAutosaveName("BookerMain")` (UserDefaults) and only centered on first launch. Note: the raw debug binary and `Booker.app` use different UserDefaults domains, so persistence is per-artifact.
 
 ## Build & run
@@ -35,7 +35,7 @@ Headless debug modes (no GUI window — safe to run in an agent session):
 
 ```sh
 ./.build/debug/booker list       # dump parsed bookmarks: url<TAB>title | tags | aliases
-./.build/debug/booker rank <q>   # print ranked results for a query (verify matcher/search)
+./.build/debug/booker rank <q>   # ranked results (honors searchInLinks; BOOKER_SEARCH_LINKS=0/1 overrides)
 ./.build/debug/booker <query>    # launch GUI with the search box pre-filled
 ```
 

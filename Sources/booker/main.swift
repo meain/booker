@@ -86,6 +86,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let cmd = event.modifierFlags.contains(.command)
             let ctrl = event.modifierFlags.contains(.control)
 
+            // ⌘, toggles settings from anywhere.
+            if cmd && event.keyCode == 43 {
+                self.state.toggleSettings()
+                return nil
+            }
+            // While settings are open, only Escape is intercepted; let SwiftUI
+            // handle the toggle/button/tab interactions.
+            if self.state.showSettings {
+                if event.keyCode == 53 {   // Escape
+                    self.state.cancel()
+                    return nil
+                }
+                return event
+            }
+
             switch event.keyCode {
             case 36, 76:                 // Return / Enter
                 self.state.activate(copy: cmd)
@@ -124,9 +139,16 @@ if CommandLine.arguments.dropFirst().first == "list" {
 }
 
 // `booker rank <query>` prints the ranked results for a query (debug/scripting).
+// Honors the persisted searchInLinks setting; override with BOOKER_SEARCH_LINKS=0/1.
 if CommandLine.arguments.dropFirst().first == "rank" {
     let query = CommandLine.arguments.dropFirst(2).joined(separator: " ")
-    let ranked = Matcher.rank(BookmarkParser.load(), query: query, frecency: Frecency())
+    let searchInLinks: Bool
+    if let e = ProcessInfo.processInfo.environment["BOOKER_SEARCH_LINKS"] {
+        searchInLinks = (e != "0")
+    } else {
+        searchInLinks = UserDefaults.standard.object(forKey: "searchInLinks") as? Bool ?? true
+    }
+    let ranked = Matcher.rank(BookmarkParser.load(), query: query, frecency: Frecency(), searchInLinks: searchInLinks)
     for bm in ranked {
         let meta = (bm.aliases.map { "@\($0)" } + bm.tags.map { "#\($0)" }).joined(separator: " ")
         print("\(bm.title)\t\(meta)")

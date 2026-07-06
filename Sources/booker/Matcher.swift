@@ -16,7 +16,8 @@ enum Matcher {
 
     /// Returns bookmarks that match `query`, best first.
     /// When the (post-prefix) term is empty, results are ordered purely by frecency.
-    static func rank(_ bookmarks: [Bookmark], query: String, frecency: Frecency) -> [Bookmark] {
+    /// `searchInLinks` gates whether general search also matches against URLs.
+    static func rank(_ bookmarks: [Bookmark], query: String, frecency: Frecency, searchInLinks: Bool = true) -> [Bookmark] {
         let (mode, term) = parse(query)
 
         if term.isEmpty {
@@ -31,7 +32,7 @@ enum Matcher {
 
         var scored: [(bm: Bookmark, score: Double)] = []
         for bm in bookmarks {
-            guard let base = matchScore(mode: mode, term: term, in: bm) else { continue }
+            guard let base = matchScore(mode: mode, term: term, in: bm, searchInLinks: searchInLinks) else { continue }
             let combined = base + frecency.score(for: bm.url) * 2.0
             scored.append((bm, combined))
         }
@@ -53,7 +54,7 @@ enum Matcher {
     }
 
     /// Best match score for a bookmark under the given mode, or nil if no match.
-    private static func matchScore(mode: Mode, term: String, in bm: Bookmark) -> Double? {
+    private static func matchScore(mode: Mode, term: String, in bm: Bookmark, searchInLinks: Bool) -> Double? {
         switch mode {
         case .alias:
             return fieldScore(term, bm.aliases)
@@ -73,7 +74,7 @@ enum Matcher {
             if let s = fieldScore(term, bm.tags) {
                 best = max(best ?? 0, 10_000 + s)
             }
-            if let s = fuzzy(term, bm.url.lowercased()) {
+            if searchInLinks, let s = fuzzy(term, bm.url.lowercased()) {
                 best = max(best ?? 0, s)   // lowest band: URLs match many things
             }
             return best

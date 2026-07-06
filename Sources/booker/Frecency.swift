@@ -43,6 +43,12 @@ final class Frecency {
         save()
     }
 
+    /// Clears all recorded usage and removes the on-disk store.
+    func reset() {
+        entries = [:]
+        try? FileManager.default.removeItem(atPath: path)
+    }
+
     private func save() {
         if let data = try? JSONEncoder().encode(entries) {
             try? data.write(to: URL(fileURLWithPath: path))
