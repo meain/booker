@@ -12,16 +12,12 @@ struct Bookmark: Identifiable {
 
     var needsParam: Bool { url.contains("%s") }
 
-    /// Text used for fuzzy matching: title + aliases + tags.
-    let haystack: String
-
     init(id: Int, title: String, url: String, tags: [String], aliases: [String]) {
         self.id = id
         self.title = title
         self.url = url
         self.tags = tags
         self.aliases = aliases
-        self.haystack = ([title] + aliases + tags).joined(separator: " ").lowercased()
     }
 }
 

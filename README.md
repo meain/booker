@@ -15,7 +15,13 @@ URLs may contain a `%s` placeholder that is prompted for at open time
 
 ## Features
 
-- **Fuzzy search** over titles, tags, and aliases.
+- **Fuzzy search** over titles, tags, and aliases. In general search the
+  priority is **alias > title > tag** — an alias hit always floats above a
+  title-only hit, which floats above a tag-only hit.
+- **Scoped search by prefix**:
+  - `@foo` — search **aliases** only
+  - `#foo` — search **tags** only
+  - bare `@` or `#` — list everything that has any alias / tag, by frecency
 - **Aliases highlighted** as orange chips; tags shown in cyan.
 - **Frecency ranking** — bookmarks you open often (and recently) float to the
   top. With an empty query the list is ordered purely by frecency.

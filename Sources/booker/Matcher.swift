@@ -2,19 +2,36 @@ import Foundation
 
 /// Lightweight fuzzy matcher + ranker. Combines a fzf-style subsequence match
 /// score with frecency so that both relevance and habit drive the ordering.
+///
+/// Search modes, chosen by the query prefix:
+///   - `@foo`  → search aliases only
+///   - `#foo`  → search tags only
+///   - `foo`   → general search (title + aliases + tags), aliases weighted highest
 enum Matcher {
-    /// Returns bookmarks that match `query`, best first.
-    /// When `query` is empty, everything is returned sorted purely by frecency.
-    static func rank(_ bookmarks: [Bookmark], query: String, frecency: Frecency) -> [Bookmark] {
-        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+    private enum Mode {
+        case general
+        case alias
+        case tag
+    }
 
-        if q.isEmpty {
-            return bookmarks.sorted { frecency.score(for: $0.url) > frecency.score(for: $1.url) }
+    /// Returns bookmarks that match `query`, best first.
+    /// When the (post-prefix) term is empty, results are ordered purely by frecency.
+    static func rank(_ bookmarks: [Bookmark], query: String, frecency: Frecency) -> [Bookmark] {
+        let (mode, term) = parse(query)
+
+        if term.isEmpty {
+            let pool: [Bookmark]
+            switch mode {
+            case .general: pool = bookmarks
+            case .alias:   pool = bookmarks.filter { !$0.aliases.isEmpty }
+            case .tag:     pool = bookmarks.filter { !$0.tags.isEmpty }
+            }
+            return pool.sorted { frecency.score(for: $0.url) > frecency.score(for: $1.url) }
         }
 
         var scored: [(bm: Bookmark, score: Double)] = []
         for bm in bookmarks {
-            guard let base = matchScore(query: q, in: bm) else { continue }
+            guard let base = matchScore(mode: mode, term: term, in: bm) else { continue }
             let combined = base + frecency.score(for: bm.url) * 2.0
             scored.append((bm, combined))
         }
@@ -23,28 +40,57 @@ enum Matcher {
             .map { $0.bm }
     }
 
-    /// Best match score for a bookmark, or nil if the query doesn't match at all.
-    /// Considers exact/prefix alias hits (large boost) and fuzzy title/tag hits.
-    private static func matchScore(query: String, in bm: Bookmark) -> Double? {
-        var best: Double? = nil
+    /// Splits the raw query into a search mode and a lowercased term.
+    private static func parse(_ query: String) -> (Mode, String) {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        if q.hasPrefix("@") {
+            return (.alias, String(q.dropFirst()).lowercased())
+        }
+        if q.hasPrefix("#") {
+            return (.tag, String(q.dropFirst()).lowercased())
+        }
+        return (.general, q.lowercased())
+    }
 
-        // Alias matches — typing an alias is the fastest path, so weight it heavily.
-        for alias in bm.aliases {
-            let a = alias.lowercased()
-            if a == query {
+    /// Best match score for a bookmark under the given mode, or nil if no match.
+    private static func matchScore(mode: Mode, term: String, in bm: Bookmark) -> Double? {
+        switch mode {
+        case .alias:
+            return fieldScore(term, bm.aliases)
+        case .tag:
+            return fieldScore(term, bm.tags)
+        case .general:
+            // Priority bands: alias > title > tag. The offsets guarantee any
+            // alias hit outranks any title-only hit, and any title hit outranks
+            // any tag-only hit, regardless of the within-band fuzzy score.
+            var best: Double? = nil
+            if let s = fieldScore(term, bm.aliases) {
+                best = max(best ?? 0, 20_000 + s)
+            }
+            if let s = fuzzy(term, bm.title.lowercased()) {
+                best = max(best ?? 0, 5_000 + s)
+            }
+            if let s = fieldScore(term, bm.tags) {
+                best = max(best ?? 0, s)
+            }
+            return best
+        }
+    }
+
+    /// Scores `term` against a set of fields (aliases or tags), rewarding
+    /// exact and prefix hits over loose fuzzy ones. Returns the best, or nil.
+    private static func fieldScore(_ term: String, _ fields: [String]) -> Double? {
+        var best: Double? = nil
+        for field in fields {
+            let f = field.lowercased()
+            if f == term {
                 best = max(best ?? 0, 1000)
-            } else if a.hasPrefix(query) {
+            } else if f.hasPrefix(term) {
                 best = max(best ?? 0, 500)
-            } else if let s = fuzzy(query, a) {
-                best = max(best ?? 0, s + 100)   // still favour alias hits over body text
+            } else if let s = fuzzy(term, f) {
+                best = max(best ?? 0, 200 + s)
             }
         }
-
-        // Fuzzy match against the combined haystack (title + aliases + tags).
-        if let s = fuzzy(query, bm.haystack) {
-            best = max(best ?? 0, s)
-        }
-
         return best
     }
 

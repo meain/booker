@@ -16,6 +16,7 @@ struct PickerView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
         )
+        .onChange(of: state.query) { _ in state.refilter() }
     }
 
     private var searchField: some View {
@@ -36,7 +37,7 @@ struct PickerView: View {
     private var resultsList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 0) {
+                VStack(spacing: 0) {
                     if state.paramMode {
                         Text("Press Enter to open · ⌘Enter to copy")
                             .font(.system(size: 12))

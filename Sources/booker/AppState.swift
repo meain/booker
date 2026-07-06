@@ -7,9 +7,7 @@ final class AppState: ObservableObject {
     private let bookmarks: [Bookmark]
     private let frecency: Frecency
 
-    @Published var query: String = "" {
-        didSet { if !paramMode { refilter() } }
-    }
+    @Published var query: String = ""
     @Published private(set) var results: [Bookmark] = []
     @Published var selected: Int = 0
 
@@ -17,9 +15,10 @@ final class AppState: ObservableObject {
     @Published private(set) var paramMode: Bool = false
     private var pendingBookmark: Bookmark?
 
-    init() {
+    init(initialQuery: String = "") {
         self.bookmarks = BookmarkParser.load()
         self.frecency = Frecency()
+        self.query = initialQuery
         refilter()
     }
 
@@ -27,10 +26,14 @@ final class AppState: ObservableObject {
         if paramMode, let bm = pendingBookmark {
             return "Parameter for \(bm.title)…"
         }
-        return "Search bookmarks…"
+        return "Search  ·  @alias  ·  #tag"
     }
 
-    private func refilter() {
+    /// Recomputes results for the current query. Called from the view's
+    /// `.onChange(of:)` — NOT from a `didSet`, which would mutate published
+    /// state mid-view-update and leave the list rendering stale.
+    func refilter() {
+        guard !paramMode else { return }   // in param mode the query holds the %s value
         results = Matcher.rank(bookmarks, query: query, frecency: frecency)
         selected = 0
     }

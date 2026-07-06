@@ -10,8 +10,13 @@ final class KeyableWindow: NSWindow {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow!
-    private let state = AppState()
+    private let state: AppState
     private var monitor: Any?
+
+    init(initialQuery: String) {
+        self.state = AppState(initialQuery: initialQuery)
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let content = PickerView(state: state)
@@ -37,8 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
     }
 
-    /// Place the window centered horizontally, in the upper third of the
-    /// screen that currently has the mouse.
+    /// Center the window on the screen that currently has the mouse.
     private func positionWindow() {
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main
@@ -48,7 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let size = window.frame.size
         let x = frame.midX - size.width / 2
-        let y = frame.midY + frame.height * 0.12
+        let y = frame.midY - size.height / 2
         window.setFrameOrigin(NSPoint(x: x, y: y))
     }
 
@@ -95,8 +99,22 @@ if CommandLine.arguments.dropFirst().first == "list" {
     exit(0)
 }
 
+// `booker rank <query>` prints the ranked results for a query (debug/scripting).
+if CommandLine.arguments.dropFirst().first == "rank" {
+    let query = CommandLine.arguments.dropFirst(2).joined(separator: " ")
+    let ranked = Matcher.rank(BookmarkParser.load(), query: query, frecency: Frecency())
+    for bm in ranked {
+        let meta = (bm.aliases.map { "@\($0)" } + bm.tags.map { "#\($0)" }).joined(separator: " ")
+        print("\(bm.title)\t\(meta)")
+    }
+    exit(0)
+}
+
+// Any remaining args become the initial search query (like `,bm open <term>`).
+let initialQuery = CommandLine.arguments.dropFirst().joined(separator: " ")
+
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)   // no Dock icon; still shows a key window
-let delegate = AppDelegate()
+let delegate = AppDelegate(initialQuery: initialQuery)
 app.delegate = delegate
 app.run()
