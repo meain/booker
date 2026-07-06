@@ -23,7 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let hosting = NSHostingView(rootView: content)
 
         window = KeyableWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 640, height: 460),
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 500),
             styleMask: [.borderless, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -40,6 +40,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+
+        // Debug helper: BOOKER_SHOT=/path renders the window to a PNG and exits.
+        if let shot = ProcessInfo.processInfo.environment["BOOKER_SHOT"] {
+            let delay = Double(ProcessInfo.processInfo.environment["BOOKER_SHOT_DELAY"] ?? "0.7") ?? 0.7
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                if let view = self.window.contentView,
+                   let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                    view.cacheDisplay(in: view.bounds, to: rep)
+                    if let data = rep.representation(using: .png, properties: [:]) {
+                        try? data.write(to: URL(fileURLWithPath: shot))
+                    }
+                }
+                NSApp.terminate(nil)
+            }
+        }
     }
 
     /// Center the window on the screen that currently has the mouse.

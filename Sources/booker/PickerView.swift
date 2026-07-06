@@ -76,8 +76,8 @@ struct PickerView: View {
 
     private var rowsHeight: CGFloat {
         if state.paramMode { return 44 }
-        let count = min(max(state.results.count, 1), 9)
-        return CGFloat(count) * 44 + 12
+        let count = min(max(state.results.count, 1), 8)
+        return CGFloat(count) * 52 + 12
     }
 }
 
@@ -85,13 +85,29 @@ private struct Row: View {
     let bookmark: Bookmark
     let selected: Bool
 
+    /// URL without the scheme, for a cleaner secondary line.
+    private var displayURL: String {
+        var u = bookmark.url
+        for prefix in ["https://", "http://"] where u.hasPrefix(prefix) {
+            u.removeFirst(prefix.count)
+        }
+        return u
+    }
+
     var body: some View {
         HStack(spacing: 8) {
-            Text(bookmark.title)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .font(.system(size: 14))
-                .foregroundStyle(selected ? Color.white : Color.primary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(bookmark.title)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .font(.system(size: 14))
+                    .foregroundStyle(selected ? Color.white : Color.primary)
+                Text(displayURL)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(selected ? Color.white.opacity(0.8) : Color.secondary)
+            }
 
             Spacer(minLength: 8)
 
@@ -113,7 +129,7 @@ private struct Row: View {
             }
         }
         .padding(.horizontal, 12)
-        .frame(height: 40)
+        .frame(height: 52)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8)

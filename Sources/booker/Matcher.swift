@@ -60,18 +60,21 @@ enum Matcher {
         case .tag:
             return fieldScore(term, bm.tags)
         case .general:
-            // Priority bands: alias > title > tag. The offsets guarantee any
-            // alias hit outranks any title-only hit, and any title hit outranks
-            // any tag-only hit, regardless of the within-band fuzzy score.
+            // Priority bands: alias > title > tag > url. The offsets guarantee a
+            // hit in a higher band always outranks any hit in a lower one,
+            // regardless of the within-band fuzzy score.
             var best: Double? = nil
             if let s = fieldScore(term, bm.aliases) {
-                best = max(best ?? 0, 20_000 + s)
+                best = max(best ?? 0, 30_000 + s)
             }
             if let s = fuzzy(term, bm.title.lowercased()) {
-                best = max(best ?? 0, 5_000 + s)
+                best = max(best ?? 0, 20_000 + s)
             }
             if let s = fieldScore(term, bm.tags) {
-                best = max(best ?? 0, s)
+                best = max(best ?? 0, 10_000 + s)
+            }
+            if let s = fuzzy(term, bm.url.lowercased()) {
+                best = max(best ?? 0, s)   // lowest band: URLs match many things
             }
             return best
         }
