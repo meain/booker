@@ -22,7 +22,7 @@ open time. Parser handles all of this — see `Bookmark.swift`.
 - `Sources/booker/Matcher.swift` — fuzzy scorer. General-mode priority bands: **alias > title > tag > url**. `@foo` scopes to aliases, `#foo` to tags.
 - `Sources/booker/AppState.swift` — query/results/selection + open/copy/`%s`. Refilter is driven from the view's `.onChange`, NOT a `didSet` (mutating published state mid-view-update renders stale).
 - `Sources/booker/PickerView.swift` — SwiftUI UI. Uses a plain `VStack` (not `LazyVStack` — the latter cached stale rows when the result set changed wholesale).
-- `Sources/booker/main.swift` — borderless key window, key monitor, headless `list`/`rank` modes, `BOOKER_SHOT` render helper.
+- `Sources/booker/main.swift` — borderless+resizable key window (drag-to-move, edge-resize), key monitor, headless `list`/`rank` modes, `BOOKER_SHOT` render helper. Window frame is persisted via `setFrameAutosaveName("BookerMain")` (UserDefaults) and only centered on first launch. Note: the raw debug binary and `Booker.app` use different UserDefaults domains, so persistence is per-artifact.
 
 ## Build & run
 

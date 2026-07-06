@@ -24,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         window = KeyableWindow(
             contentRect: NSRect(x: 0, y: 0, width: 640, height: 500),
-            styleMask: [.borderless, .fullSizeContentView],
+            styleMask: [.borderless, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -34,8 +34,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.hasShadow = true
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        window.isMovableByWindowBackground = true       // drag anywhere to move
+        window.minSize = NSSize(width: 360, height: 160)
 
-        positionWindow()
+        // Restore the last size/position; center only on the very first launch.
+        // The autosave name persists frame changes to UserDefaults automatically.
+        let autosave = NSWindow.FrameAutosaveName("BookerMain")
+        if !window.setFrameUsingName(autosave) {
+            positionWindow()
+        }
+        window.setFrameAutosaveName(autosave)
+
         installKeyMonitor()
 
         NSApp.activate(ignoringOtherApps: true)

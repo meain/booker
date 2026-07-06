@@ -27,6 +27,8 @@ URLs may contain a `%s` placeholder that is prompted for at open time
   top. With an empty query the list is ordered purely by frecency.
 - **`%s` parameters** — selecting a bookmark with `%s` switches to an inline
   prompt for the value before opening.
+- **Resizable & draggable** — drag anywhere on the window to move it, drag an
+  edge to resize. The size and position are remembered across launches.
 - **Read-only** — adding/removing/editing bookmarks stays in the `,bm` script.
 
 ## Keybindings

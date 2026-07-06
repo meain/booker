@@ -10,6 +10,7 @@ struct PickerView: View {
             Divider()
             resultsList
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(VisualEffect())
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
@@ -65,19 +66,13 @@ struct PickerView: View {
                 }
                 .padding(6)
             }
-            .frame(height: rowsHeight)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onChange(of: state.selected) { newValue in
                 withAnimation(.easeOut(duration: 0.08)) {
                     proxy.scrollTo(newValue, anchor: .center)
                 }
             }
         }
-    }
-
-    private var rowsHeight: CGFloat {
-        if state.paramMode { return 44 }
-        let count = min(max(state.results.count, 1), 8)
-        return CGFloat(count) * 52 + 12
     }
 }
 
