@@ -7,6 +7,10 @@ import Foundation
 ///   - `@foo`  → search aliases only
 ///   - `#foo`  → search tags only
 ///   - `foo`   → general search (title + aliases + tags), aliases weighted highest
+///
+/// Multi-word queries are order-independent: every word must match a field, in
+/// any order (so "task work" finds "Workday Tasks"). A straightforward in-order
+/// match earns a bonus so it ranks above a shuffled one.
 enum Matcher {
     private enum Mode {
         case general
@@ -30,9 +34,10 @@ enum Matcher {
             return pool.sorted { frecency.score(for: $0.url) > frecency.score(for: $1.url) }
         }
 
+        let tokens = term.split(separator: " ").map(String.init)
         var scored: [(bm: Bookmark, score: Double)] = []
         for bm in bookmarks {
-            guard let base = matchScore(mode: mode, term: term, in: bm, searchInLinks: searchInLinks) else { continue }
+            guard let base = matchScore(mode: mode, tokens: tokens, term: term, in: bm, searchInLinks: searchInLinks) else { continue }
             let combined = base + frecency.score(for: bm.url) * 2.0
             scored.append((bm, combined))
         }
@@ -54,34 +59,84 @@ enum Matcher {
     }
 
     /// Best match score for a bookmark under the given mode, or nil if no match.
-    private static func matchScore(mode: Mode, term: String, in bm: Bookmark, searchInLinks: Bool) -> Double? {
+    /// `tokens` are the whitespace-split words of `term`; every token must match.
+    private static func matchScore(mode: Mode, tokens: [String], term: String, in bm: Bookmark, searchInLinks: Bool) -> Double? {
         switch mode {
         case .alias:
-            return fieldScore(term, bm.aliases)
+            return tokensFieldScore(tokens, bm.aliases)
         case .tag:
-            return fieldScore(term, bm.tags)
+            return tokensFieldScore(tokens, bm.tags)
         case .general:
             // Priority bands: alias > title > tag > url. The offsets guarantee a
             // hit in a higher band always outranks any hit in a lower one,
             // regardless of the within-band fuzzy score.
             var best: Double? = nil
-            if let s = fieldScore(term, bm.aliases) {
+            if let s = tokensFieldScore(tokens, bm.aliases) {
                 best = max(best ?? 0, 30_000 + s)
             }
-            if let s = fuzzy(term, bm.title.lowercased()) {
+            if let s = multiFuzzy(tokens, whole: term, bm.title.lowercased()) {
                 best = max(best ?? 0, 20_000 + s)
             }
-            if let s = fieldScore(term, bm.tags) {
+            if let s = tokensFieldScore(tokens, bm.tags) {
                 best = max(best ?? 0, 10_000 + s)
             }
-            if searchInLinks, let s = fuzzy(term, bm.url.lowercased()) {
+            if searchInLinks, let s = multiFuzzy(tokens, whole: term, bm.url.lowercased()) {
                 best = max(best ?? 0, s)   // lowest band: URLs match many things
             }
             return best
         }
     }
 
-    /// Scores `term` against a set of fields (aliases or tags), rewarding
+    /// Matches `tokens` against a single text (title or url).
+    /// - Single word: fzf-style fuzzy subsequence (forgiving, for quick typing).
+    /// - Multiple words: each word must appear as a contiguous substring, in any
+    ///   order (avoids the scattered-subsequence noise that plagues loose
+    ///   multi-word fuzzy). A whole-term in-order match adds a bonus so
+    ///   straightforward matches rank above shuffled ones.
+    /// Returns nil if the match fails.
+    private static func multiFuzzy(_ tokens: [String], whole: String, _ text: String) -> Double? {
+        if tokens.count <= 1 {
+            return fuzzy(whole, text)
+        }
+        var total = 0.0
+        for tok in tokens {
+            guard let s = substringScore(tok, text) else { return nil }
+            total += s
+        }
+        if let s = fuzzy(whole, text) {
+            total += 1000 + s   // straightforward (in-order) match ranks higher
+        }
+        return total
+    }
+
+    /// Scores a token found as a contiguous substring of `text`, rewarding
+    /// word-boundary starts. Returns nil if the token is not a substring.
+    private static func substringScore(_ token: String, _ text: String) -> Double? {
+        guard let r = text.range(of: token) else { return nil }
+        var score = Double(token.count) * 4.0
+        if r.lowerBound == text.startIndex {
+            score += 4.0
+        } else {
+            let before = text[text.index(before: r.lowerBound)]
+            if before == " " || before == "/" || before == "-" || before == "." {
+                score += 3.0
+            }
+        }
+        return score - Double(text.count) * 0.01
+    }
+
+    /// Every token must match some field in the set (aliases or tags), in any
+    /// order; scores are summed. Returns nil if any token matches nothing.
+    private static func tokensFieldScore(_ tokens: [String], _ fields: [String]) -> Double? {
+        var total = 0.0
+        for tok in tokens {
+            guard let s = fieldScore(tok, fields) else { return nil }
+            total += s
+        }
+        return total
+    }
+
+    /// Scores a single token against a set of fields (aliases or tags), rewarding
     /// exact and prefix hits over loose fuzzy ones. Returns the best, or nil.
     private static func fieldScore(_ term: String, _ fields: [String]) -> Double? {
         var best: Double? = nil

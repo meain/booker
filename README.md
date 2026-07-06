@@ -18,6 +18,9 @@ URLs may contain a `%s` placeholder that is prompted for at open time
 - **Fuzzy search** over titles, tags, and aliases. In general search the
   priority is **alias > title > tag** — an alias hit always floats above a
   title-only hit, which floats above a tag-only hit.
+- **Order-independent multi-word search** — "task work" finds "Workday Tasks".
+  Each word must match (in any order); a straightforward in-order match ranks
+  higher.
 - **Scoped search by prefix**:
   - `@foo` — search **aliases** only
   - `#foo` — search **tags** only
