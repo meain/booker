@@ -15,23 +15,35 @@ final class AppState: ObservableObject {
     @Published private(set) var paramMode: Bool = false
     private var pendingBookmark: Bookmark?
 
+    // Favicons.
+    let favicons = FaviconStore()
+
     // Settings.
     @Published var showSettings: Bool = false
     @Published private(set) var frecencyCleared: Bool = false
+    @Published private(set) var faviconsCleared: Bool = false
     private static let searchInLinksKey = "searchInLinks"
+    private static let showFaviconsKey = "showFavicons"
     @Published var searchInLinks: Bool {
         didSet { UserDefaults.standard.set(searchInLinks, forKey: Self.searchInLinksKey) }
+    }
+    @Published var showFavicons: Bool {
+        didSet { UserDefaults.standard.set(showFavicons, forKey: Self.showFaviconsKey) }
     }
 
     init(initialQuery: String = "") {
         self.bookmarks = BookmarkParser.load()
         self.frecency = Frecency()
-        // Default the link-search toggle to on when unset.
+        // Default the toggles to on when unset.
         let defaults = UserDefaults.standard
         if defaults.object(forKey: Self.searchInLinksKey) == nil {
             defaults.set(true, forKey: Self.searchInLinksKey)
         }
+        if defaults.object(forKey: Self.showFaviconsKey) == nil {
+            defaults.set(true, forKey: Self.showFaviconsKey)
+        }
         self.searchInLinks = defaults.bool(forKey: Self.searchInLinksKey)
+        self.showFavicons = defaults.bool(forKey: Self.showFaviconsKey)
         self.query = initialQuery
         refilter()
     }
@@ -50,6 +62,14 @@ final class AppState: ObservableObject {
         guard !paramMode else { return }   // in param mode the query holds the %s value
         results = Matcher.rank(bookmarks, query: query, frecency: frecency, searchInLinks: searchInLinks)
         selected = 0
+        loadVisibleFavicons()
+    }
+
+    /// Kick off favicon loads for the current results (no-op when disabled or
+    /// already cached/in-flight).
+    func loadVisibleFavicons() {
+        guard showFavicons else { return }
+        for bm in results { favicons.load(forURL: bm.url) }
     }
 
     // MARK: - Settings
@@ -65,6 +85,7 @@ final class AppState: ObservableObject {
     func closeSettings() {
         showSettings = false
         frecencyCleared = false
+        faviconsCleared = false
         refilter()   // pick up any changed toggle
     }
 
@@ -77,6 +98,11 @@ final class AppState: ObservableObject {
         frecency.reset()
         frecencyCleared = true
         refilter()
+    }
+
+    func clearFaviconCache() {
+        favicons.clearCache()
+        faviconsCleared = true
     }
 
     // MARK: - Navigation

@@ -19,6 +19,7 @@ open time. Parser handles all of this — see `Bookmark.swift`.
 
 - `Sources/booker/Bookmark.swift` — markdown parser (greedy metadata split).
 - `Sources/booker/Frecency.swift` — usage store at `~/.local/share/booker/frecency.json` (count + decaying recency).
+- `Sources/booker/Favicon.swift` — `FaviconStore`: per-host favicon fetch (DuckDuckGo `icons.duckduckgo.com/ip3/<host>.ico`) + disk cache at `~/.local/share/booker/favicons/<host>.png`. Async off the main thread; publishes arrivals so rows refresh. Gated by the `showFavicons` setting.
 - `Sources/booker/Matcher.swift` — fuzzy scorer. General-mode priority bands: **alias > title > tag > url**. `@foo` scopes to aliases, `#foo` to tags. The url band is gated by the `searchInLinks` setting.
 - `Sources/booker/AppState.swift` — query/results/selection + open/copy/`%s`. Refilter is driven from the view's `.onChange`, NOT a `didSet` (mutating published state mid-view-update renders stale).
 - `Sources/booker/PickerView.swift` — SwiftUI UI + `SettingsView` (`⌘,`/gear: search-in-links toggle, reset frecency). Uses a plain `VStack` (not `LazyVStack` — the latter cached stale rows when the result set changed wholesale).
@@ -63,6 +64,10 @@ live-typing behavior.
 `BOOKER_SHOT` uses `contentView.cacheDisplay(in:to:)` →
 `bitmapImageRepForCachingDisplay` → PNG; it is gated behind the env var and has
 no effect on normal launches.
+
+Favicon fetching needs network; the agent Bash sandbox blocks it. To test a
+cold favicon fetch, launch with `dangerouslyDisableSandbox: true` and a longer
+`BOOKER_SHOT_DELAY` (~8s). Cached-icon rendering works sandboxed (disk only).
 
 ## Hotkey
 

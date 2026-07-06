@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PickerView: View {
     @ObservedObject var state: AppState
+    @ObservedObject var favicons: FaviconStore
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -67,7 +68,10 @@ struct PickerView: View {
                             .padding(.vertical, 10)
                     } else {
                         ForEach(Array(state.results.enumerated()), id: \.element.id) { idx, bm in
-                            Row(bookmark: bm, selected: idx == state.selected)
+                            Row(bookmark: bm,
+                                selected: idx == state.selected,
+                                showFavicon: state.showFavicons,
+                                favicon: state.showFavicons ? favicons.image(forURL: bm.url) : nil)
                                 .id(idx)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
@@ -92,6 +96,8 @@ struct PickerView: View {
 private struct Row: View {
     let bookmark: Bookmark
     let selected: Bool
+    var showFavicon: Bool = false
+    var favicon: NSImage? = nil
 
     /// URL without the scheme, for a cleaner secondary line.
     private var displayURL: String {
@@ -102,8 +108,25 @@ private struct Row: View {
         return u
     }
 
+    @ViewBuilder private var faviconView: some View {
+        if let favicon = favicon {
+            Image(nsImage: favicon)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 16, height: 16)
+        } else {
+            Image(systemName: "globe")
+                .font(.system(size: 13))
+                .foregroundStyle(selected ? Color.white.opacity(0.7) : Color.secondary)
+                .frame(width: 16, height: 16)
+        }
+    }
+
     var body: some View {
         HStack(spacing: 8) {
+            if showFavicon {
+                faviconView
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(bookmark.title)
                     .lineLimit(1)
@@ -164,7 +187,8 @@ private struct SettingsView: View {
             .padding(16)
             Divider()
 
-            VStack(alignment: .leading, spacing: 18) {
+            ScrollView {
+              VStack(alignment: .leading, spacing: 18) {
                 Toggle(isOn: $state.searchInLinks) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Search in links")
@@ -176,6 +200,20 @@ private struct SettingsView: View {
                 }
                 .toggleStyle(.switch)
                 .onChange(of: state.searchInLinks) { _ in state.searchInLinksChanged() }
+
+                Divider()
+
+                Toggle(isOn: $state.showFavicons) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show favicons")
+                            .font(.system(size: 14))
+                        Text("Fetch and cache each site's icon (cached at ~/.local/share/booker/favicons)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.switch)
+                .onChange(of: state.showFavicons) { _ in state.loadVisibleFavicons() }
 
                 Divider()
 
@@ -193,10 +231,24 @@ private struct SettingsView: View {
                     }
                     .disabled(state.frecencyCleared)
                 }
-            }
-            .padding(16)
 
-            Spacer()
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Favicon cache")
+                            .font(.system(size: 14))
+                        Text("Remove all cached icons; they re-download on next use")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(action: { state.clearFaviconCache() }) {
+                        Text(state.faviconsCleared ? "Cleared ✓" : "Clear")
+                    }
+                    .disabled(state.faviconsCleared)
+                }
+              }
+              .padding(16)
+            }
         }
     }
 }

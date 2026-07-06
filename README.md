@@ -29,8 +29,11 @@ URLs may contain a `%s` placeholder that is prompted for at open time
   prompt for the value before opening.
 - **Resizable & draggable** — drag anywhere on the window to move it, drag an
   edge to resize. The size and position are remembered across launches.
-- **Settings** (`⌘,` or the gear icon) — toggle whether search matches URLs, and
-  reset the frecency index.
+- **Favicons** — each site's icon is fetched (via DuckDuckGo's icon service) and
+  cached to disk (`~/.local/share/booker/favicons/`), so they show instantly on
+  later launches. On by default; toggle in settings.
+- **Settings** (`⌘,` or the gear icon) — toggle URL search, toggle favicons,
+  reset the frecency index, clear the favicon cache.
 - **Read-only** — adding/removing/editing bookmarks stays in the `,bm` script.
 
 ## Keybindings

@@ -19,7 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let content = PickerView(state: state)
+        let content = PickerView(state: state, favicons: state.favicons)
         let hosting = NSHostingView(rootView: content)
 
         window = KeyableWindow(
