@@ -19,7 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let content = PickerView(state: state, favicons: state.favicons)
+        let shotMode = ProcessInfo.processInfo.environment["BOOKER_SHOT"] != nil
+        let content = PickerView(state: state, favicons: state.favicons, screenshotMode: shotMode)
         let hosting = NSHostingView(rootView: content)
 
         window = KeyableWindow(
@@ -52,6 +53,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Debug helper: BOOKER_SHOT=/path renders the window to a PNG and exits.
         if let shot = ProcessInfo.processInfo.environment["BOOKER_SHOT"] {
+            // Force light appearance so the solid screenshot background is light.
+            window.appearance = NSAppearance(named: .aqua)
             let delay = Double(ProcessInfo.processInfo.environment["BOOKER_SHOT_DELAY"] ?? "0.7") ?? 0.7
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 if let view = self.window.contentView,
@@ -149,9 +152,11 @@ if CommandLine.arguments.dropFirst().first == "rank" {
         searchInLinks = UserDefaults.standard.object(forKey: "searchInLinks") as? Bool ?? true
     }
     let ranked = Matcher.rank(BookmarkParser.load(), query: query, frecency: Frecency(), searchInLinks: searchInLinks)
-    for bm in ranked {
+    for r in ranked {
+        let bm = r.bookmark
         let meta = (bm.aliases.map { "@\($0)" } + bm.tags.map { "#\($0)" }).joined(separator: " ")
-        print("\(bm.title)\t\(meta)")
+        let url = r.param.map { bm.url.replacingOccurrences(of: "%s", with: $0) } ?? bm.url
+        print("\(bm.title)\t\(meta)\t\(url)")
     }
     exit(0)
 }

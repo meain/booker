@@ -1,0 +1,15 @@
+- [GitHub](https://github.com/) #dev #git @gh
+- [Hacker News](https://news.ycombinator.com/) #news @hn
+- [Wikipedia](https://www.wikipedia.org/) #reference @wiki
+- [Wikipedia Article](https://en.wikipedia.org/wiki/%s) #reference @w
+- [Rust std docs](https://doc.rust-lang.org/std/) #dev #docs @rust
+- [Swift Documentation](https://developer.apple.com/documentation/swift) #dev #docs @swift
+- [MDN Web Docs](https://developer.mozilla.org/) #dev #docs @mdn
+- [Stack Overflow](https://stackoverflow.com/) #dev @so
+- [Hacker News Search](https://hn.algolia.com/?q=%s) #news #search @hns
+- [YouTube](https://www.youtube.com/) #media @yt
+- [Reddit](https://www.reddit.com/) #news @reddit
+- [DuckDuckGo](https://duckduckgo.com/) #search @ddg
+- [Arch Wiki](https://wiki.archlinux.org/) #linux #reference @aw
+- [Homebrew Formulae](https://formulae.brew.sh/) #dev #mac @brew
+- [crates.io](https://crates.io/) #dev #rust @crates

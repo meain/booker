@@ -11,6 +11,14 @@ import Foundation
 /// Multi-word queries are order-independent: every word must match a field, in
 /// any order (so "task work" finds "Workday Tasks"). A straightforward in-order
 /// match earns a bonus so it ranks above a shuffled one.
+/// A ranked result. `param` is set when the query supplied an inline `%s` value
+/// (e.g. `dp 123` → the `@dp` bookmark with param `123`), meaning the URL is
+/// ready to open without the interactive prompt.
+struct MatchResult {
+    let bookmark: Bookmark
+    let param: String?
+}
+
 enum Matcher {
     private enum Mode {
         case general
@@ -21,7 +29,7 @@ enum Matcher {
     /// Returns bookmarks that match `query`, best first.
     /// When the (post-prefix) term is empty, results are ordered purely by frecency.
     /// `searchInLinks` gates whether general search also matches against URLs.
-    static func rank(_ bookmarks: [Bookmark], query: String, frecency: Frecency, searchInLinks: Bool = true) -> [Bookmark] {
+    static func rank(_ bookmarks: [Bookmark], query: String, frecency: Frecency, searchInLinks: Bool = true) -> [MatchResult] {
         let (mode, term) = parse(query)
 
         if term.isEmpty {
@@ -31,19 +39,47 @@ enum Matcher {
             case .alias:   pool = bookmarks.filter { !$0.aliases.isEmpty }
             case .tag:     pool = bookmarks.filter { !$0.tags.isEmpty }
             }
-            return pool.sorted { frecency.score(for: $0.url) > frecency.score(for: $1.url) }
+            return pool
+                .sorted { frecency.score(for: $0.url) > frecency.score(for: $1.url) }
+                .map { MatchResult(bookmark: $0, param: nil) }
         }
 
         let tokens = term.split(separator: " ").map(String.init)
-        var scored: [(bm: Bookmark, score: Double)] = []
-        for bm in bookmarks {
+
+        // Inline %s parameter: `<alias> <param…>` where the first word matches an
+        // alias of a bookmark whose URL contains %s. The rest becomes the value,
+        // shown pre-filled and opened directly (no prompt). Original case of the
+        // param is preserved from the raw query.
+        let rawTokens = query.trimmingCharacters(in: .whitespaces).split(separator: " ").map(String.init)
+        var inline: [(MatchResult, Double)] = []
+        var inlineIDs = Set<Int>()
+        if mode == .general, tokens.count >= 2, rawTokens.count >= 2 {
+            let first = tokens[0]
+            let param = rawTokens.dropFirst().joined(separator: " ")
+            for bm in bookmarks where bm.needsParam {
+                var s: Double?
+                for alias in bm.aliases {
+                    let a = alias.lowercased()
+                    if a == first { s = max(s ?? 0, 1000) }
+                    else if a.hasPrefix(first) { s = max(s ?? 0, 500) }
+                }
+                if let s = s {
+                    let score = 30_000 + s + frecency.score(for: bm.url) * 2.0
+                    inline.append((MatchResult(bookmark: bm, param: param), score))
+                    inlineIDs.insert(bm.id)
+                }
+            }
+        }
+
+        var scored: [(MatchResult, Double)] = inline
+        for bm in bookmarks where !inlineIDs.contains(bm.id) {
             guard let base = matchScore(mode: mode, tokens: tokens, term: term, in: bm, searchInLinks: searchInLinks) else { continue }
             let combined = base + frecency.score(for: bm.url) * 2.0
-            scored.append((bm, combined))
+            scored.append((MatchResult(bookmark: bm, param: nil), combined))
         }
         return scored
-            .sorted { $0.score > $1.score }
-            .map { $0.bm }
+            .sorted { $0.1 > $1.1 }
+            .map { $0.0 }
     }
 
     /// Splits the raw query into a search mode and a lowercased term.

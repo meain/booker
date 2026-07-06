@@ -22,8 +22,22 @@ struct Bookmark: Identifiable {
 }
 
 enum BookmarkParser {
-    /// Path to the bookmarks file (respects $BM_FILE, matching the ,bm script).
+    static let fileDefaultsKey = "bookmarkFile"
+
+    /// Path to the bookmarks file. Precedence (highest first):
+    ///   1. `$BOOKER_BM_FILE` — hard override, always wins (used for
+    ///      screenshots/testing against a demo file without touching the real one).
+    ///   2. the path set in settings (UserDefaults).
+    ///   3. `$BM_FILE` (matching the ,bm script).
+    ///   4. the default `~/.local/share/bookmarks.md`.
+    /// A leading `~` is expanded.
     static var filePath: String {
+        if let env = ProcessInfo.processInfo.environment["BOOKER_BM_FILE"], !env.isEmpty {
+            return (env as NSString).expandingTildeInPath
+        }
+        if let p = UserDefaults.standard.string(forKey: fileDefaultsKey), !p.isEmpty {
+            return (p as NSString).expandingTildeInPath
+        }
         if let env = ProcessInfo.processInfo.environment["BM_FILE"], !env.isEmpty {
             return env
         }
