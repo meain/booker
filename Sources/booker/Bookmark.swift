@@ -4,8 +4,8 @@ import Foundation
 /// Line format: `- [Title](url) #tag1 #tag2 @alias1 @alias2`
 /// URLs may contain a `%s` placeholder that is filled in at open time.
 struct Bookmark: Identifiable {
-    let id: Int          // stable index among parsed bookmarks (identity for the UI)
-    let line: Int        // 0-based line number in the source file (for edit/delete)
+    let id: Int  // stable index among parsed bookmarks (identity for the UI)
+    let line: Int  // 0-based line number in the source file (for edit/delete)
     let title: String
     let url: String
     let tags: [String]

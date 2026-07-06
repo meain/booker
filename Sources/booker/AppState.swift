@@ -103,7 +103,7 @@ final class AppState: ObservableObject {
     /// `.onChange(of:)` — NOT from a `didSet`, which would mutate published
     /// state mid-view-update and leave the list rendering stale.
     func refilter() {
-        guard !paramMode else { return }   // in param mode the query holds the %s value
+        guard !paramMode else { return }  // in param mode the query holds the %s value
         pendingDeleteID = nil
         let matches = Matcher.rank(bookmarks, query: query, frecency: frecency, searchInLinks: searchInLinks)
 
@@ -124,7 +124,8 @@ final class AppState: ObservableObject {
     /// The bookmark currently highlighted, if the selected row is a bookmark.
     var selectedBookmark: Bookmark? {
         guard results.indices.contains(selected),
-              case .bookmark(let m) = results[selected] else { return nil }
+            case .bookmark(let m) = results[selected]
+        else { return nil }
         return m.bookmark
     }
 
@@ -169,7 +170,7 @@ final class AppState: ObservableObject {
         showSettings = false
         frecencyCleared = false
         faviconsCleared = false
-        refilter()   // pick up any changed toggle
+        refilter()  // pick up any changed toggle
     }
 
     /// Called when the search-in-links toggle flips (from the view's onChange).
@@ -286,7 +287,8 @@ final class AppState: ObservableObject {
             pb.clearContents()
             pb.setString(url, forType: .string)
         } else if let u = URL(string: url)
-                    ?? url.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed).flatMap(URL.init(string:)) {
+            ?? url.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed).flatMap(URL.init(string:))
+        {
             NSWorkspace.shared.open(u)
         }
         NSApp.terminate(nil)
@@ -400,7 +402,8 @@ final class AppState: ObservableObject {
 
     func confirmDelete() {
         guard let id = pendingDeleteID,
-              let bm = bookmarks.first(where: { $0.id == id }) else { return }
+            let bm = bookmarks.first(where: { $0.id == id })
+        else { return }
         pendingDeleteID = nil
         BookmarkParser.deleteLine(at: bm.line)
         reloadBookmarks()

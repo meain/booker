@@ -5,7 +5,7 @@ SHOT := .claude/skills/screenshot-test/shot.sh
 # Query for `run`/`rank`/`shot`, e.g. `make rank Q=github`
 Q ?=
 
-.PHONY: build release app run list rank shot install link clean help
+.PHONY: build release app run list rank shot lint format install link clean help
 
 help:
 	@echo "Targets:"
@@ -16,9 +16,17 @@ help:
 	@echo "  list      Headless: dump parsed bookmarks"
 	@echo "  rank      Headless: rank results for Q=<query>"
 	@echo "  shot      Render GUI to PNG for Q=<query> (see screenshot-test skill)"
+	@echo "  lint      Check formatting (swift-format, as CI does)"
+	@echo "  format    Auto-format sources in place"
 	@echo "  install   Copy Booker.app to /Applications"
 	@echo "  link      Symlink Booker.app to /Applications"
 	@echo "  clean     Remove build artifacts"
+
+lint:
+	swift format lint --strict --recursive --configuration .swift-format Sources
+
+format:
+	swift format --in-place --recursive --configuration .swift-format Sources
 
 build:
 	swift build

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "indentation": { "spaces": 4 },
+  "lineLength": 160,
+  "maximumBlankLines": 1,
+  "respectsExistingLineBreaks": true,
+  "rules": {
+    "DoNotUseSemicolons": false,
+    "ReplaceForEachWithForLoop": false,
+    "OrderedImports": true,
+    "UseLetInEveryBoundCaseVariable": true,
+    "ReturnVoidInsteadOfEmptyTuple": true,
+    "NoEmptyTrailingClosureParentheses": true
+  }
+}

@@ -15,7 +15,7 @@ file. Supports add (⌘N) / edit (⌘E) / delete (⌘⌫) — writes back to the
 URLs may contain `)` and `#` fragments, and a `%s` placeholder prompted for at
 open time (the entered value is percent-encoded before substitution). Parser
 handles all of this — see `Bookmark.swift`. Full format/search docs live in
-`docs/format.md` (linked from the README and the settings page).
+`docs/guide.md` (linked from the README and the settings page).
 
 File path precedence (`BookmarkParser.filePath`): `$BOOKER_BM_FILE` (hard
 override, always wins — used for screenshots/testing against `docs/demo-bookmarks.md`
@@ -30,7 +30,7 @@ live (`AppState.setBookmarkFile` → `reloadBookmarks`).
 - `Sources/booker/Favicon.swift` — `FaviconStore`: per-host favicon fetch (DuckDuckGo `icons.duckduckgo.com/ip3/<host>.ico`) + disk cache at `~/.local/share/booker/favicons/<host>.png`. Async off the main thread; publishes arrivals so rows refresh. Gated by the `showFavicons` setting.
 - `Sources/booker/Matcher.swift` — fuzzy scorer, returns `[MatchResult]` (bookmark + optional inline `param`). General-mode priority bands: **alias > title > tag > url**. `@foo` scopes to aliases, `#foo` to tags. The url band is gated by the `searchInLinks` setting. Multi-word queries are order-independent: single word = fuzzy subsequence; multiple words = each word must be a contiguous substring (avoids scattered-subsequence noise), with an in-order bonus so straightforward matches rank higher. **Inline `%s`**: `<alias> <value…>` (e.g. `dp 123`) where the first word matches an alias of a `%s` bookmark sets `MatchResult.param`, shown pre-filled and opened directly (value case preserved from the raw query).
 - `Sources/booker/AppState.swift` — query/`results`/selection + open/copy/`%s` + add-edit-delete. `results` is `[ResultRow]` (`.bookmark` / `.openAll(alias, bookmarks)` for a shared alias / `.add(query)` when a URL-looking query has no matches). Add/edit share one form (`showForm`, `form*` fields, `editingLine` nil=append else replace); delete is a two-step confirm (`pendingDeleteID`, confirmed by the next `↩`). Refilter is driven from the view's `.onChange`, NOT a `didSet` (mutating published state mid-view-update renders stale).
-- `Sources/booker/PickerView.swift` — SwiftUI UI: `Row` (with delete-confirm state), `ActionRow` (open-all / add rows), `BookmarkFormView` (add/edit form — auto-fetch `<title>`, tag suggestions, dedupe + alias-collision warnings, favicon; focus set async after mount or keystrokes drop). Plus `SettingsView` (`⌘,`/gear: bookmarks-file path + Choose… panel, search-in-links toggle, favicon toggle, match-highlight ColorPicker, reset frecency, clear favicon cache, link to `docs/format.md`). Rows highlight matched query words with a configurable colour (`highlightColorHex`, default grey `#808080`; `Color(hex:)`/`hexString` helpers). Settings content scrolls under a fixed header. Results use a `LazyVStack` for fast first paint; identity is the bookmark id on both the `ForEach` and the row `.id()` / `scrollTo` (mixing a positional `.id(idx)` with `LazyVStack` previously caused stale rows). `AlwaysOnScroller` forces a persistent legacy scroller (configured in `viewDidMoveToWindow`) so the scrollbar doesn't pop in after launch. `screenshotMode` swaps the translucent `VisualEffect` for a solid `windowBackgroundColor` (see screenshot note below).
+- `Sources/booker/PickerView.swift` — SwiftUI UI: `Row` (with delete-confirm state), `ActionRow` (open-all / add rows), `BookmarkFormView` (add/edit form — auto-fetch `<title>`, tag suggestions, dedupe + alias-collision warnings, favicon; focus set async after mount or keystrokes drop). Plus `SettingsView` (`⌘,`/gear: bookmarks-file path + Choose… panel, search-in-links toggle, favicon toggle, match-highlight ColorPicker, reset frecency, clear favicon cache, link to `docs/guide.md`). Rows highlight matched query words with a configurable colour (`highlightColorHex`, default grey `#808080`; `Color(hex:)`/`hexString` helpers). Settings content scrolls under a fixed header. Results use a `LazyVStack` for fast first paint; identity is the bookmark id on both the `ForEach` and the row `.id()` / `scrollTo` (mixing a positional `.id(idx)` with `LazyVStack` previously caused stale rows). `AlwaysOnScroller` forces a persistent legacy scroller (configured in `viewDidMoveToWindow`) so the scrollbar doesn't pop in after launch. `screenshotMode` swaps the translucent `VisualEffect` for a solid `windowBackgroundColor` (see screenshot note below).
 - `Sources/booker/main.swift` — borderless+resizable key window (drag-to-move, edge-resize), key monitor (arrows/Ctrl-n/p nav, ⌘N add, ⌘E edit, ⌘⌫ delete, ⌘, settings; in form/settings modes only Esc is intercepted so text fields work), headless `list`/`rank` modes, `BOOKER_SHOT` render helper. `installEditMenu()` builds a minimal Edit menu — a bare `NSApplication` has no menu bar, so without it the standard editing key equivalents (⌘V/⌘C/⌘X/⌘A/undo) don't reach text fields (paste silently fails). Window frame is persisted via `setFrameAutosaveName("BookerMain")` (UserDefaults) and only centered on first launch. Opening settings resizes to a default (640×500); opening the add/edit form resizes to the form's exact measured height (`AppState.formHeight`, read from a `GeometryReader` — measuring via `PreferenceKey` didn't fire, and `.fixedSize` caused a resize runaway); closing either restores the saved picker frame (`observeOverlaySize` via Combine). Note: the raw debug binary and `Booker.app` use different UserDefaults domains, so persistence is per-artifact.
 
 ## Keys
@@ -44,7 +44,16 @@ live (`AppState.setBookmarkFile` → `reloadBookmarks`).
 ```sh
 swift build                      # dev binary at ./.build/debug/booker
 ./build-app.sh                   # release -> ./Booker.app (LSUIElement, ad-hoc signed)
+make lint                        # swift-format lint (config .swift-format, 4-space); make format to fix
 ```
+
+The Swift compiler comes from the system Xcode toolchain (nixpkgs Swift on macOS
+is unreliable). `flake.nix` provides a devShell with `swift-format` (the linter);
+`nix develop` then build with the system `swift`.
+
+CI (`.github/workflows/`): **ci.yml** lints (`swift format lint --strict`) + builds
+on push/PR to `main`; **release.yml** builds `Booker.app`, zips it, and creates a
+GitHub Release on `v*` tags. Both run on `macos-15` (Swift 6, has `swift format`).
 
 Headless debug modes (no GUI window — safe to run in an agent session):
 

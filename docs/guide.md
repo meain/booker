@@ -1,6 +1,6 @@
-# Bookmark file format & search syntax
+# Booker guide — format, search & shortcuts
 
-booker reads a plain-text Markdown file. Every bookmark is one line.
+Booker reads a plain-text Markdown file. Every bookmark is one line.
 
 ## Line format
 

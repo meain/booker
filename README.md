@@ -11,8 +11,8 @@ Reads a plaintext Markdown file (`$BM_FILE`, default
 - [Title](url) #tag1 #tag2 @alias1 @alias2
 ```
 
-See **[docs/format.md](docs/format.md)** for the full file format, search
-syntax, `%s` parameters, and file-location rules.
+See the **[guide](docs/guide.md)** for the full file format, search syntax,
+`%s` parameters, shortcuts, and file-location rules.
 
 ### Parameterized bookmarks (`%s`)
 

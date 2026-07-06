@@ -1,3 +1,9 @@
 .build/
 Booker.app/
+Booker-*.zip
 *.xcodeproj
+
+# nix
+result
+result-*
+.direnv/

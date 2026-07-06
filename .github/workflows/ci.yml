@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint (swift-format)
+        run: swift format lint --strict --recursive --configuration .swift-format Sources
+
+      - name: Build
+        run: swift build

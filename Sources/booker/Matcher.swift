@@ -36,10 +36,11 @@ enum Matcher {
             let pool: [Bookmark]
             switch mode {
             case .general: pool = bookmarks
-            case .alias:   pool = bookmarks.filter { !$0.aliases.isEmpty }
-            case .tag:     pool = bookmarks.filter { !$0.tags.isEmpty }
+            case .alias: pool = bookmarks.filter { !$0.aliases.isEmpty }
+            case .tag: pool = bookmarks.filter { !$0.tags.isEmpty }
             }
-            return pool
+            return
+                pool
                 .sorted { frecency.score(for: $0.url) > frecency.score(for: $1.url) }
                 .map { MatchResult(bookmark: $0, param: nil) }
         }
@@ -60,8 +61,7 @@ enum Matcher {
                 var s: Double?
                 for alias in bm.aliases {
                     let a = alias.lowercased()
-                    if a == first { s = max(s ?? 0, 1000) }
-                    else if a.hasPrefix(first) { s = max(s ?? 0, 500) }
+                    if a == first { s = max(s ?? 0, 1000) } else if a.hasPrefix(first) { s = max(s ?? 0, 500) }
                 }
                 if let s = s {
                     let score = 30_000 + s + frecency.score(for: bm.url) * 2.0
@@ -77,7 +77,8 @@ enum Matcher {
             let combined = base + frecency.score(for: bm.url) * 2.0
             scored.append((MatchResult(bookmark: bm, param: nil), combined))
         }
-        return scored
+        return
+            scored
             .sorted { $0.1 > $1.1 }
             .map { $0.0 }
     }
@@ -117,7 +118,7 @@ enum Matcher {
                 best = max(best ?? 0, 10_000 + s)
             }
             if searchInLinks, let s = multiFuzzy(tokens, whole: term, bm.url.lowercased()) {
-                best = max(best ?? 0, s)   // lowest band: URLs match many things
+                best = max(best ?? 0, s)  // lowest band: URLs match many things
             }
             return best
         }
@@ -140,7 +141,7 @@ enum Matcher {
             total += s
         }
         if let s = fuzzy(whole, text) {
-            total += 1000 + s   // straightforward (in-order) match ranks higher
+            total += 1000 + s  // straightforward (in-order) match ranks higher
         }
         return total
     }
@@ -205,11 +206,11 @@ enum Matcher {
             guard qi < q.count else { break }
             if t[ti] == q[qi] {
                 var bonus = 1.0
-                if prevMatched { bonus += 3.0 }                       // consecutive run
+                if prevMatched { bonus += 3.0 }  // consecutive run
                 if prevChar == " " || prevChar == "/" || prevChar == "-" {
-                    bonus += 2.0                                      // word/segment start
+                    bonus += 2.0  // word/segment start
                 }
-                if ti == 0 { bonus += 2.0 }                          // very start
+                if ti == 0 { bonus += 2.0 }  // very start
                 score += bonus
                 qi += 1
                 prevMatched = true

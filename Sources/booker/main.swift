@@ -41,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.hasShadow = true
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        window.isMovableByWindowBackground = true       // drag anywhere to move
+        window.isMovableByWindowBackground = true  // drag anywhere to move
         window.minSize = NSSize(width: 360, height: 160)
 
         // Restore the last size/position; center only on the very first launch.
@@ -66,7 +66,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let delay = Double(ProcessInfo.processInfo.environment["BOOKER_SHOT_DELAY"] ?? "0.7") ?? 0.7
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 if let view = self.window.contentView,
-                   let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                    let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)
+                {
                     view.cacheDisplay(in: view.bounds, to: rep)
                     if let data = rep.representation(using: .png, properties: [:]) {
                         try? data.write(to: URL(fileURLWithPath: shot))
@@ -149,7 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // In the add/edit form, only Escape is intercepted; SwiftUI handles
             // typing, Tab, and the ⌘↩ Save shortcut.
             if self.state.showForm {
-                if event.keyCode == 53 { self.state.cancel() ; return nil }   // Escape
+                if event.keyCode == 53 { self.state.cancel(); return nil }  // Escape
                 return event
             }
             // ⌘, toggles settings from anywhere.
@@ -160,7 +161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // While settings are open, only Escape is intercepted; let SwiftUI
             // handle the toggle/button/tab interactions.
             if self.state.showSettings {
-                if event.keyCode == 53 {   // Escape
+                if event.keyCode == 53 {  // Escape
                     self.state.cancel()
                     return nil
                 }
@@ -172,22 +173,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if cmd && event.keyCode == 51 { self.state.requestDeleteSelected(); return nil }
 
             switch event.keyCode {
-            case 36, 76:                 // Return / Enter
+            case 36, 76:  // Return / Enter
                 self.state.activate(copy: cmd)
                 return nil
-            case 53:                     // Escape
+            case 53:  // Escape
                 self.state.cancel()
                 return nil
-            case 125:                    // Down arrow
+            case 125:  // Down arrow
                 self.state.moveDown()
                 return nil
-            case 126:                    // Up arrow
+            case 126:  // Up arrow
                 self.state.moveUp()
                 return nil
-            case 45 where ctrl:          // Ctrl-n
+            case 45 where ctrl:  // Ctrl-n
                 self.state.moveDown()
                 return nil
-            case 35 where ctrl:          // Ctrl-p
+            case 35 where ctrl:  // Ctrl-p
                 self.state.moveUp()
                 return nil
             default:
@@ -232,7 +233,7 @@ if CommandLine.arguments.dropFirst().first == "rank" {
 let initialQuery = CommandLine.arguments.dropFirst().joined(separator: " ")
 
 let app = NSApplication.shared
-app.setActivationPolicy(.accessory)   // no Dock icon; still shows a key window
+app.setActivationPolicy(.accessory)  // no Dock icon; still shows a key window
 let delegate = AppDelegate(initialQuery: initialQuery)
 app.delegate = delegate
 app.run()

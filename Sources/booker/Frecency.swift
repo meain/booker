@@ -5,7 +5,7 @@ import Foundation
 final class Frecency {
     private struct Entry: Codable {
         var count: Int
-        var last: TimeInterval   // epoch seconds of last access
+        var last: TimeInterval  // epoch seconds of last access
     }
 
     private var entries: [String: Entry]
@@ -18,7 +18,8 @@ final class Frecency {
         self.path = dir + "/frecency.json"
 
         if let data = FileManager.default.contents(atPath: path),
-           let decoded = try? JSONDecoder().decode([String: Entry].self, from: data) {
+            let decoded = try? JSONDecoder().decode([String: Entry].self, from: data)
+        {
             self.entries = decoded
         } else {
             self.entries = [:]
@@ -30,7 +31,7 @@ final class Frecency {
     func score(for url: String) -> Double {
         guard let e = entries[url] else { return 0 }
         let days = max(0, (Date().timeIntervalSince1970 - e.last) / 86_400)
-        let recencyBonus = 6.0 / (1.0 + days)      // ~6 today, ~3 yesterday, tapering off
+        let recencyBonus = 6.0 / (1.0 + days)  // ~6 today, ~3 yesterday, tapering off
         return Double(e.count) + recencyBonus
     }
 

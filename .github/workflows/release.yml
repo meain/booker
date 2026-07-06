@@ -1,0 +1,25 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Booker.app
+        run: ./build-app.sh
+
+      - name: Zip app
+        run: ditto -c -k --keepParent Booker.app "Booker-${GITHUB_REF_NAME}.zip"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Booker-*.zip
+          generate_release_notes: true

@@ -1,25 +1,27 @@
 import AppKit
 import SwiftUI
 
-/// Where the format documentation lives (opened from settings).
-let formatDocsURL = "https://github.com/meain/booker/blob/main/docs/format.md"
+/// Where the documentation lives (opened from settings).
+let docsURL = "https://github.com/meain/booker/blob/main/docs/guide.md"
 
 extension Color {
     init?(hex: String) {
         let s = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
         guard s.count == 6, let v = Int(s, radix: 16) else { return nil }
-        self = Color(.sRGB,
-                     red: Double((v >> 16) & 0xff) / 255,
-                     green: Double((v >> 8) & 0xff) / 255,
-                     blue: Double(v & 0xff) / 255)
+        self = Color(
+            .sRGB,
+            red: Double((v >> 16) & 0xff) / 255,
+            green: Double((v >> 8) & 0xff) / 255,
+            blue: Double(v & 0xff) / 255)
     }
 
     var hexString: String {
         let c = NSColor(self).usingColorSpace(.sRGB) ?? NSColor.gray
-        return String(format: "#%02X%02X%02X",
-                      Int(round(c.redComponent * 255)),
-                      Int(round(c.greenComponent * 255)),
-                      Int(round(c.blueComponent * 255)))
+        return String(
+            format: "#%02X%02X%02X",
+            Int(round(c.redComponent * 255)),
+            Int(round(c.greenComponent * 255)),
+            Int(round(c.blueComponent * 255)))
     }
 }
 
@@ -141,7 +143,8 @@ struct PickerView: View {
         let sel = idx == state.selected
         switch row {
         case .bookmark(let m):
-            Row(bookmark: m.bookmark,
+            Row(
+                bookmark: m.bookmark,
                 param: m.param,
                 selected: sel,
                 showFavicon: state.showFavicons,
@@ -150,15 +153,17 @@ struct PickerView: View {
                 highlightColor: Color(hex: state.highlightColorHex) ?? .gray,
                 pendingDelete: state.pendingDeleteID == m.bookmark.id)
         case .openAll(let alias, let bms):
-            ActionRow(icon: "square.on.square",
-                      title: "Open all \(bms.filter { !$0.needsParam }.count) · @\(alias)",
-                      subtitle: bms.map { $0.title }.joined(separator: " · "),
-                      selected: sel)
+            ActionRow(
+                icon: "square.on.square",
+                title: "Open all \(bms.filter { !$0.needsParam }.count) · @\(alias)",
+                subtitle: bms.map { $0.title }.joined(separator: " · "),
+                selected: sel)
         case .add(let q):
-            ActionRow(icon: "plus.circle",
-                      title: "Add bookmark",
-                      subtitle: q,
-                      selected: sel)
+            ActionRow(
+                icon: "plus.circle",
+                title: "Add bookmark",
+                subtitle: q,
+                selected: sel)
         }
     }
 }
@@ -195,7 +200,8 @@ private struct Row: View {
             var start = text.startIndex
             while let r = text.range(of: token, options: .caseInsensitive, range: start..<text.endIndex) {
                 if let lo = AttributedString.Index(r.lowerBound, within: attr),
-                   let hi = AttributedString.Index(r.upperBound, within: attr) {
+                    let hi = AttributedString.Index(r.upperBound, within: attr)
+                {
                     attr[lo..<hi].backgroundColor = color
                 }
                 if r.upperBound == text.endIndex { break }
@@ -314,8 +320,9 @@ private struct SettingsView: View {
     @State private var editPath: String = ""
 
     private var highlightBinding: Binding<Color> {
-        Binding(get: { Color(hex: state.highlightColorHex) ?? .gray },
-                set: { state.highlightColorHex = $0.hexString })
+        Binding(
+            get: { Color(hex: state.highlightColorHex) ?? .gray },
+            set: { state.highlightColorHex = $0.hexString })
     }
 
     var body: some View {
@@ -334,113 +341,113 @@ private struct SettingsView: View {
             Divider()
 
             ScrollView {
-              VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Bookmarks file")
-                        .font(.system(size: 14))
-                    Text("\(state.bookmarkCount) bookmarks loaded · leave empty to use $BM_FILE or the default")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                    HStack {
-                        TextField("~/.local/share/bookmarks.md", text: $editPath)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(size: 12))
-                            .onSubmit { apply() }
-                        Button("Choose…") { chooseFile() }
-                        Button("Apply") { apply() }
-                    }
-                }
-
-                Divider()
-
-                Toggle(isOn: $state.searchInLinks) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Search in links")
+                VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Bookmarks file")
                             .font(.system(size: 14))
-                        Text("Also match the URL, not just title, tags, and aliases")
+                        Text("\(state.bookmarkCount) bookmarks loaded · leave empty to use $BM_FILE or the default")
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
+                        HStack {
+                            TextField("~/.local/share/bookmarks.md", text: $editPath)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 12))
+                                .onSubmit { apply() }
+                            Button("Choose…") { chooseFile() }
+                            Button("Apply") { apply() }
+                        }
                     }
+
+                    Divider()
+
+                    Toggle(isOn: $state.searchInLinks) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Search in links")
+                                .font(.system(size: 14))
+                            Text("Also match the URL, not just title, tags, and aliases")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(.switch)
+                    .onChange(of: state.searchInLinks) { _ in state.searchInLinksChanged() }
+
+                    Divider()
+
+                    Toggle(isOn: $state.showFavicons) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Show favicons")
+                                .font(.system(size: 14))
+                            Text("Fetch and cache each site's icon (cached at ~/.local/share/booker/favicons)")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(.switch)
+                    .onChange(of: state.showFavicons) { _ in state.loadVisibleFavicons() }
+
+                    Divider()
+
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Match highlight color")
+                                .font(.system(size: 14))
+                            Text("Behind matched text in results")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        ColorPicker("", selection: highlightBinding, supportsOpacity: false)
+                            .labelsHidden()
+                        Button("Reset") { state.highlightColorHex = AppState.defaultHighlightHex }
+                    }
+
+                    Divider()
+
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Frecency index")
+                                .font(.system(size: 14))
+                            Text("Usage ranking stored at ~/.local/share/booker/frecency.json")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button(action: { state.resetFrecency() }) {
+                            Text(state.frecencyCleared ? "Cleared ✓" : "Reset")
+                        }
+                        .disabled(state.frecencyCleared)
+                    }
+
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Favicon cache")
+                                .font(.system(size: 14))
+                            Text("Remove all cached icons; they re-download on next use")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button(action: { state.clearFaviconCache() }) {
+                            Text(state.faviconsCleared ? "Cleared ✓" : "Clear")
+                        }
+                        .disabled(state.faviconsCleared)
+                    }
+
+                    Divider()
+
+                    Button(action: { openDocs() }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "doc.text")
+                            Text("Guide — format, search & shortcuts")
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 10))
+                        }
+                        .font(.system(size: 13))
+                    }
+                    .buttonStyle(.link)
                 }
-                .toggleStyle(.switch)
-                .onChange(of: state.searchInLinks) { _ in state.searchInLinksChanged() }
-
-                Divider()
-
-                Toggle(isOn: $state.showFavicons) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Show favicons")
-                            .font(.system(size: 14))
-                        Text("Fetch and cache each site's icon (cached at ~/.local/share/booker/favicons)")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .toggleStyle(.switch)
-                .onChange(of: state.showFavicons) { _ in state.loadVisibleFavicons() }
-
-                Divider()
-
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Match highlight color")
-                            .font(.system(size: 14))
-                        Text("Behind matched text in results")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    ColorPicker("", selection: highlightBinding, supportsOpacity: false)
-                        .labelsHidden()
-                    Button("Reset") { state.highlightColorHex = AppState.defaultHighlightHex }
-                }
-
-                Divider()
-
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Frecency index")
-                            .font(.system(size: 14))
-                        Text("Usage ranking stored at ~/.local/share/booker/frecency.json")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button(action: { state.resetFrecency() }) {
-                        Text(state.frecencyCleared ? "Cleared ✓" : "Reset")
-                    }
-                    .disabled(state.frecencyCleared)
-                }
-
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Favicon cache")
-                            .font(.system(size: 14))
-                        Text("Remove all cached icons; they re-download on next use")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button(action: { state.clearFaviconCache() }) {
-                        Text(state.faviconsCleared ? "Cleared ✓" : "Clear")
-                    }
-                    .disabled(state.faviconsCleared)
-                }
-
-                Divider()
-
-                Button(action: { openDocs() }) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "doc.text")
-                        Text("Bookmark file format & search syntax")
-                        Image(systemName: "arrow.up.right")
-                            .font(.system(size: 10))
-                    }
-                    .font(.system(size: 13))
-                }
-                .buttonStyle(.link)
-              }
-              .padding(16)
+                .padding(16)
             }
         }
         .onAppear { editPath = state.bookmarkFilePath }
@@ -467,7 +474,7 @@ private struct SettingsView: View {
     }
 
     private func openDocs() {
-        if let u = URL(string: formatDocsURL) { NSWorkspace.shared.open(u) }
+        if let u = URL(string: docsURL) { NSWorkspace.shared.open(u) }
     }
 }
 
@@ -483,8 +490,7 @@ private struct BookmarkFormView: View {
     private enum Field { case url, title, tags, aliases }
 
     private var canSave: Bool {
-        !state.formURL.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !state.formTitle.trimmingCharacters(in: .whitespaces).isEmpty
+        !state.formURL.trimmingCharacters(in: .whitespaces).isEmpty && !state.formTitle.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     var body: some View {
@@ -534,13 +540,15 @@ private struct BookmarkFormView: View {
             }
             .padding(16)
         }
-        .background(GeometryReader { g -> Color in
-            let h = g.size.height
-            DispatchQueue.main.async {
-                if abs(state.formHeight - h) > 0.5 { state.formHeight = h }
+        .background(
+            GeometryReader { g -> Color in
+                let h = g.size.height
+                DispatchQueue.main.async {
+                    if abs(state.formHeight - h) > 0.5 { state.formHeight = h }
+                }
+                return Color.clear
             }
-            return Color.clear
-        })
+        )
         .onAppear {
             evaluate()
             updateAliasWarning()
@@ -600,7 +608,9 @@ private struct BookmarkFormView: View {
     private func updateAliasWarning() {
         let aliases = state.formAliases.split(separator: " ").map { $0.replacingOccurrences(of: "@", with: "") }
         let used = state.aliasesInUse(aliases)
-        aliasWarning = used.isEmpty ? nil
+        aliasWarning =
+            used.isEmpty
+            ? nil
             : "\(used.map { "@\($0)" }.joined(separator: ", ")) already used — will open together"
     }
 
@@ -620,9 +630,10 @@ private struct BookmarkFormView: View {
 
     private static func extractTitle(_ data: Data) -> String? {
         guard let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1),
-              let re = try? NSRegularExpression(pattern: "<title[^>]*>([\\s\\S]*?)</title>", options: [.caseInsensitive]),
-              let m = re.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
-              let gr = Range(m.range(at: 1), in: html) else { return nil }
+            let re = try? NSRegularExpression(pattern: "<title[^>]*>([\\s\\S]*?)</title>", options: [.caseInsensitive]),
+            let m = re.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+            let gr = Range(m.range(at: 1), in: html)
+        else { return nil }
         var t = String(html[gr])
         for (k, v) in ["&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&#39;": "'", "&nbsp;": " "] {
             t = t.replacingOccurrences(of: k, with: v)

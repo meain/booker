@@ -6,8 +6,8 @@ import SwiftUI
 /// them instantly. Fetches happen off the main thread; arrivals are published
 /// so observing views refresh.
 final class FaviconStore: ObservableObject {
-    @Published private(set) var images: [String: NSImage] = [:]   // keyed by host
-    private var inFlight: Set<String> = []                        // main-thread only
+    @Published private(set) var images: [String: NSImage] = [:]  // keyed by host
+    private var inFlight: Set<String> = []  // main-thread only
     private let dir: String
 
     init() {
@@ -84,7 +84,8 @@ final class FaviconStore: ObservableObject {
 
     private static func pngData(_ image: NSImage) -> Data? {
         guard let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff) else { return nil }
+            let rep = NSBitmapImageRep(data: tiff)
+        else { return nil }
         return rep.representation(using: .png, properties: [:])
     }
 }
