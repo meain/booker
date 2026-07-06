@@ -91,7 +91,7 @@ struct PickerView: View {
     private var resultsList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     if state.paramMode {
                         Text("Press Enter to open · ⌘Enter to copy")
                             .font(.system(size: 12))
@@ -114,7 +114,7 @@ struct PickerView: View {
                                 favicon: state.showFavicons ? favicons.image(forURL: result.bookmark.url) : nil,
                                 matchTokens: matchTokens,
                                 highlightColor: Color(hex: state.highlightColorHex) ?? .gray)
-                                .id(idx)
+                                .id(result.bookmark.id)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
                                     state.selected = idx
@@ -131,8 +131,10 @@ struct PickerView: View {
             .scrollIndicators(.visible)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onChange(of: state.selected) { newValue in
+                guard state.results.indices.contains(newValue) else { return }
+                let targetID = state.results[newValue].bookmark.id
                 withAnimation(.easeOut(duration: 0.08)) {
-                    proxy.scrollTo(newValue, anchor: .center)
+                    proxy.scrollTo(targetID, anchor: .center)
                 }
             }
         }
