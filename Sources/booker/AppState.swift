@@ -1,6 +1,22 @@
 import AppKit
 import SwiftUI
 
+/// A row in the results list: a matched bookmark, an "open all" group for a
+/// shared alias, or an "add this URL" affordance.
+enum ResultRow: Identifiable {
+    case bookmark(MatchResult)
+    case openAll(alias: String, bookmarks: [Bookmark])
+    case add(query: String)
+
+    var id: String {
+        switch self {
+        case .bookmark(let m): return "bm:\(m.bookmark.id)"
+        case .openAll(let a, _): return "all:\(a)"
+        case .add: return "add"
+        }
+    }
+}
+
 /// Drives the picker: holds the bookmark list, the current query/results, the
 /// selection, and the "enter a %s parameter" sub-mode.
 final class AppState: ObservableObject {
@@ -8,12 +24,24 @@ final class AppState: ObservableObject {
     private let frecency: Frecency
 
     @Published var query: String = ""
-    @Published private(set) var results: [MatchResult] = []
+    @Published private(set) var results: [ResultRow] = []
     @Published var selected: Int = 0
 
     // %s parameter sub-mode.
     @Published private(set) var paramMode: Bool = false
     private var pendingBookmark: Bookmark?
+
+    // Add/edit form.
+    @Published var showForm: Bool = false
+    @Published var formURL: String = ""
+    @Published var formTitle: String = ""
+    @Published var formTags: String = ""
+    @Published var formAliases: String = ""
+    /// File line being edited; nil means a new bookmark (append).
+    private var editingLine: Int?
+
+    // Delete confirmation: id of the bookmark awaiting a confirm keypress.
+    @Published var pendingDeleteID: Int?
 
     // Favicons.
     let favicons = FaviconStore()
@@ -73,16 +101,55 @@ final class AppState: ObservableObject {
     /// state mid-view-update and leave the list rendering stale.
     func refilter() {
         guard !paramMode else { return }   // in param mode the query holds the %s value
-        results = Matcher.rank(bookmarks, query: query, frecency: frecency, searchInLinks: searchInLinks)
+        pendingDeleteID = nil
+        let matches = Matcher.rank(bookmarks, query: query, frecency: frecency, searchInLinks: searchInLinks)
+
+        var rows: [ResultRow] = matches.map { .bookmark($0) }
+        // "Open all" row when the query is an exact alias shared by ≥2 bookmarks.
+        if let group = sharedAliasGroup() {
+            rows.insert(.openAll(alias: group.alias, bookmarks: group.bookmarks), at: 0)
+        }
+        // "Add" row when a URL-looking query matches nothing.
+        if matches.isEmpty && looksLikeURL(query) {
+            rows = [.add(query: query.trimmingCharacters(in: .whitespaces))]
+        }
+        results = rows
         selected = 0
         loadVisibleFavicons()
+    }
+
+    /// The bookmark currently highlighted, if the selected row is a bookmark.
+    var selectedBookmark: Bookmark? {
+        guard results.indices.contains(selected),
+              case .bookmark(let m) = results[selected] else { return nil }
+        return m.bookmark
+    }
+
+    private func looksLikeURL(_ q: String) -> Bool {
+        let t = q.trimmingCharacters(in: .whitespaces).lowercased()
+        return t.hasPrefix("http://") || t.hasPrefix("https://")
+    }
+
+    /// If the query is exactly an alias used by ≥2 bookmarks, returns them.
+    private func sharedAliasGroup() -> (alias: String, bookmarks: [Bookmark])? {
+        var q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        if q.hasPrefix("@") { q.removeFirst() }
+        guard !q.isEmpty else { return nil }
+        let matches = bookmarks.filter { $0.aliases.contains { $0.lowercased() == q } }
+        return matches.count >= 2 ? (q, matches) : nil
     }
 
     /// Kick off favicon loads for the current results (no-op when disabled or
     /// already cached/in-flight).
     func loadVisibleFavicons() {
         guard showFavicons else { return }
-        for r in results { favicons.load(forURL: r.bookmark.url) }
+        for r in results {
+            switch r {
+            case .bookmark(let m): favicons.load(forURL: m.bookmark.url)
+            case .openAll(_, let bms): bms.forEach { favicons.load(forURL: $0.url) }
+            case .add: break
+            }
+        }
     }
 
     // MARK: - Settings
@@ -135,11 +202,13 @@ final class AppState: ObservableObject {
     // MARK: - Navigation
 
     func moveDown() {
+        pendingDeleteID = nil
         guard !results.isEmpty else { return }
         selected = min(selected + 1, results.count - 1)
     }
 
     func moveUp() {
+        pendingDeleteID = nil
         guard !results.isEmpty else { return }
         selected = max(selected - 1, 0)
     }
@@ -163,25 +232,48 @@ final class AppState: ObservableObject {
             return
         }
 
+        // A pending delete is confirmed by the next Enter.
+        if pendingDeleteID != nil {
+            confirmDelete()
+            return
+        }
+
         guard results.indices.contains(selected) else { return }
-        let result = results[selected]
-        let bm = result.bookmark
-
-        if let param = result.param {
-            // Inline "@alias value" — value already supplied, open directly.
-            finish(url: Self.fill(bm.url, param: param), sourceURL: bm.url, copy: copy)
-            return
+        switch results[selected] {
+        case .add(let q):
+            openAddForm(seed: q)
+        case .openAll(_, let bms):
+            openAll(bms, copy: copy)
+        case .bookmark(let result):
+            let bm = result.bookmark
+            if let param = result.param {
+                // Inline "@alias value" — value already supplied, open directly.
+                finish(url: Self.fill(bm.url, param: param), sourceURL: bm.url, copy: copy)
+            } else if bm.needsParam {
+                // Switch to parameter-entry mode instead of opening immediately.
+                pendingBookmark = bm
+                paramMode = true
+                query = ""
+            } else {
+                finish(url: bm.url, sourceURL: bm.url, copy: copy)
+            }
         }
+    }
 
-        if bm.needsParam {
-            // Switch to parameter-entry mode instead of opening immediately.
-            pendingBookmark = bm
-            paramMode = true
-            query = ""
-            return
+    /// Open every bookmark in a shared-alias group (skips %s ones), then quit.
+    private func openAll(_ bms: [Bookmark], copy: Bool) {
+        let urls = bms.filter { !$0.needsParam }.map { $0.url }
+        if copy {
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.setString(urls.joined(separator: "\n"), forType: .string)
+        } else {
+            for u in urls {
+                frecency.record(url: u)
+                if let url = URL(string: u) { NSWorkspace.shared.open(url) }
+            }
         }
-
-        finish(url: bm.url, sourceURL: bm.url, copy: copy)
+        NSApp.terminate(nil)
     }
 
     private func finish(url: String, sourceURL: String, copy: Bool) {
@@ -197,9 +289,13 @@ final class AppState: ObservableObject {
         NSApp.terminate(nil)
     }
 
-    /// Escape pressed. Closes settings, backs out of param mode, or quits.
+    /// Escape pressed. Backs out of whatever mode is active, else quits.
     func cancel() {
-        if showSettings {
+        if showForm {
+            closeForm()
+        } else if pendingDeleteID != nil {
+            pendingDeleteID = nil
+        } else if showSettings {
             closeSettings()
         } else if paramMode {
             paramMode = false
@@ -209,5 +305,101 @@ final class AppState: ObservableObject {
         } else {
             NSApp.terminate(nil)
         }
+    }
+
+    // MARK: - Navigation overrides for delete-confirm
+
+    func cancelPendingDelete() { pendingDeleteID = nil }
+
+    // MARK: - Add / edit / delete
+
+    /// Open the add form. If `seed` looks like a URL it fills the URL field,
+    /// otherwise the title field (per the query-seeding rule).
+    func openAddForm(seed: String = "") {
+        editingLine = nil
+        let s = seed.trimmingCharacters(in: .whitespaces)
+        if looksLikeURL(s) {
+            formURL = s; formTitle = ""
+        } else {
+            formURL = ""; formTitle = s
+        }
+        formTags = ""; formAliases = ""
+        showForm = true
+    }
+
+    /// Open the form pre-filled to edit the selected bookmark.
+    func openEditForm() {
+        guard let bm = selectedBookmark else { return }
+        editingLine = bm.line
+        formURL = bm.url
+        formTitle = bm.title
+        formTags = bm.tags.joined(separator: " ")
+        formAliases = bm.aliases.joined(separator: " ")
+        showForm = true
+    }
+
+    var isEditing: Bool { editingLine != nil }
+
+    func closeForm() {
+        showForm = false
+        refilter()
+    }
+
+    /// Existing bookmark with this exact URL (for the dedupe warning).
+    func existingBookmark(url: String) -> Bookmark? {
+        let u = url.trimmingCharacters(in: .whitespaces)
+        return bookmarks.first { $0.url == u && $0.line != editingLine }
+    }
+
+    /// Most-used tags among bookmarks sharing the URL's host (suggestions).
+    func suggestedTags(url: String) -> [String] {
+        guard let host = FaviconStore.host(url) else { return [] }
+        var counts: [String: Int] = [:]
+        for bm in bookmarks where bm.url.contains(host) {
+            for t in bm.tags { counts[t, default: 0] += 1 }
+        }
+        return counts.sorted { $0.value > $1.value }.prefix(3).map { $0.key }
+    }
+
+    /// Aliases already used by other bookmarks (for the collision warning).
+    func aliasesInUse(_ aliases: [String]) -> [String] {
+        let others = Set(bookmarks.filter { $0.line != editingLine }.flatMap { $0.aliases.map { $0.lowercased() } })
+        return aliases.filter { others.contains($0.lowercased()) }
+    }
+
+    /// Save the form. Title and URL are required. Appends, or rewrites the line
+    /// when editing. Returns false if invalid.
+    @discardableResult
+    func saveBookmark() -> Bool {
+        let title = formTitle.trimmingCharacters(in: .whitespaces)
+        let url = formURL.trimmingCharacters(in: .whitespaces)
+        guard !title.isEmpty, !url.isEmpty else { return false }
+        let tags = formTags.split(separator: " ").map { $0.replacingOccurrences(of: "#", with: "") }
+        let aliases = formAliases.split(separator: " ").map { $0.replacingOccurrences(of: "@", with: "") }
+        let line = BookmarkParser.format(title: title, url: url, tags: tags, aliases: aliases)
+
+        if let editingLine = editingLine {
+            BookmarkParser.replaceLine(at: editingLine, with: line)
+        } else {
+            BookmarkParser.append(line)
+        }
+        showForm = false
+        query = ""
+        reloadBookmarks()
+        return true
+    }
+
+    /// First ⌘⌫ arms the confirm; the actual delete happens on confirm.
+    func requestDeleteSelected() {
+        guard let bm = selectedBookmark else { return }
+        pendingDeleteID = bm.id
+    }
+
+    func confirmDelete() {
+        guard let id = pendingDeleteID,
+              let bm = bookmarks.first(where: { $0.id == id }) else { return }
+        pendingDeleteID = nil
+        BookmarkParser.deleteLine(at: bm.line)
+        reloadBookmarks()
     }
 }

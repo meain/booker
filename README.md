@@ -53,10 +53,19 @@ to open. Or pick it with no value to get prompted.
 - **Favicons** — each site's icon is fetched (via DuckDuckGo's icon service) and
   cached to disk (`~/.local/share/booker/favicons/`), so they show instantly on
   later launches. On by default; toggle in settings.
+- **Add / edit / delete** — **⌘N** adds a bookmark (seeded from the query:
+  a `http(s)` query fills the URL, anything else the title; a URL-looking query
+  with no matches also shows an "Add" row). The form auto-fetches the page
+  title, suggests tags from other bookmarks on the same domain, warns on
+  duplicate URLs, and shows the favicon. **⌘E** edits the selected bookmark;
+  **⌘⌫** deletes it (with a confirm). Edits rewrite the exact line, leaving the
+  rest of the file untouched.
+- **Open all via shared alias** — give several bookmarks the same alias and
+  typing it shows an **"Open all N · @alias"** row that opens them together
+  (alias collisions are intentional, not an error).
 - **Settings** (`⌘,` or the gear icon) — set the bookmarks file location, toggle
   URL search, toggle favicons, pick the match-highlight colour, reset the
   frecency index, clear the favicon cache, and open the format docs.
-- **Read-only** — booker never modifies the file; edit it in your editor.
 
 ## Screenshots
 
@@ -82,8 +91,11 @@ Settings — bookmarks file location, toggles, highlight colour, and caches:
 | `Enter` | open selected in browser |
 | `⌘ Enter` | copy selected URL to clipboard |
 | click | open that row |
+| `⌘N` | add a bookmark |
+| `⌘E` | edit selected bookmark |
+| `⌘⌫` | delete selected bookmark (confirm with `↩`) |
 | `⌘,` | open / close settings |
-| `Esc` | close settings / back out of param mode / quit |
+| `Esc` | close form/settings · back out of param mode · quit |
 
 ## Build
 

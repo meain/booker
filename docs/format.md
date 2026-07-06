@@ -69,6 +69,34 @@ The value is percent-encoded, so `w hello world` opens `…/wiki/hello%20world`.
 - **Frecency** — bookmarks you open often (and recently) float up. With an empty
   query the list is ordered purely by frecency.
 
+## Shared aliases (open multiple)
+
+Giving several bookmarks the **same alias** is intentional — it groups them.
+When you type that alias, booker shows an **"Open all N · @alias"** row at the
+top; selecting it opens every bookmark in the group at once (bookmarks with a
+`%s` are skipped). Individual rows still open one at a time.
+
+```
+- [Dashboard EU](https://…/eu) #dash @dash
+- [Dashboard US](https://…/us) #dash @dash
+- [Dashboard APJ](https://…/apj) #dash @dash
+```
+
+Typing `@dash` → "Open all 3 · @dash".
+
+## Adding, editing & deleting
+
+booker can modify the file directly:
+
+- **⌘N** — add. Seeded from the current query (a `http(s)` query fills the URL,
+  otherwise the title). Auto-fetches the page title, suggests tags from other
+  bookmarks on the same domain, warns on duplicate URLs, shows the favicon.
+- **⌘E** — edit the selected bookmark (same form, pre-filled).
+- **⌘⌫** — delete the selected bookmark (confirm with `↩`).
+
+Title and URL are required. Edits rewrite exactly that one line; comments, blank
+lines, and everything else in the file are preserved.
+
 ## File location
 
 booker resolves the bookmarks file in this order:

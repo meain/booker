@@ -89,6 +89,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let cmd = event.modifierFlags.contains(.command)
             let ctrl = event.modifierFlags.contains(.control)
 
+            // In the add/edit form, only Escape is intercepted; SwiftUI handles
+            // typing, Tab, and the ⌘↩ Save shortcut.
+            if self.state.showForm {
+                if event.keyCode == 53 { self.state.cancel() ; return nil }   // Escape
+                return event
+            }
             // ⌘, toggles settings from anywhere.
             if cmd && event.keyCode == 43 {
                 self.state.toggleSettings()
@@ -103,6 +109,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 return event
             }
+            // ⌘N add, ⌘E edit selected, ⌘⌫ delete selected.
+            if cmd && event.keyCode == 45 { self.state.openAddForm(seed: self.state.query); return nil }
+            if cmd && event.keyCode == 14 { self.state.openEditForm(); return nil }
+            if cmd && event.keyCode == 51 { self.state.requestDeleteSelected(); return nil }
 
             switch event.keyCode {
             case 36, 76:                 // Return / Enter

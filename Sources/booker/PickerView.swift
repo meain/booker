@@ -40,7 +40,9 @@ struct PickerView: View {
 
     var body: some View {
         Group {
-            if state.showSettings {
+            if state.showForm {
+                BookmarkFormView(state: state)
+            } else if state.showSettings {
                 SettingsView(state: state)
             } else {
                 VStack(spacing: 0) {
@@ -106,15 +108,9 @@ struct PickerView: View {
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)
                     } else {
-                        ForEach(Array(state.results.enumerated()), id: \.element.bookmark.id) { idx, result in
-                            Row(bookmark: result.bookmark,
-                                param: result.param,
-                                selected: idx == state.selected,
-                                showFavicon: state.showFavicons,
-                                favicon: state.showFavicons ? favicons.image(forURL: result.bookmark.url) : nil,
-                                matchTokens: matchTokens,
-                                highlightColor: Color(hex: state.highlightColorHex) ?? .gray)
-                                .id(result.bookmark.id)
+                        ForEach(Array(state.results.enumerated()), id: \.element.id) { idx, row in
+                            resultRow(row, idx: idx)
+                                .id(row.id)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
                                     state.selected = idx
@@ -132,11 +128,37 @@ struct PickerView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onChange(of: state.selected) { newValue in
                 guard state.results.indices.contains(newValue) else { return }
-                let targetID = state.results[newValue].bookmark.id
+                let targetID = state.results[newValue].id
                 withAnimation(.easeOut(duration: 0.08)) {
                     proxy.scrollTo(targetID, anchor: .center)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func resultRow(_ row: ResultRow, idx: Int) -> some View {
+        let sel = idx == state.selected
+        switch row {
+        case .bookmark(let m):
+            Row(bookmark: m.bookmark,
+                param: m.param,
+                selected: sel,
+                showFavicon: state.showFavicons,
+                favicon: state.showFavicons ? favicons.image(forURL: m.bookmark.url) : nil,
+                matchTokens: matchTokens,
+                highlightColor: Color(hex: state.highlightColorHex) ?? .gray,
+                pendingDelete: state.pendingDeleteID == m.bookmark.id)
+        case .openAll(let alias, let bms):
+            ActionRow(icon: "square.on.square",
+                      title: "Open all \(bms.filter { !$0.needsParam }.count) · @\(alias)",
+                      subtitle: bms.map { $0.title }.joined(separator: " · "),
+                      selected: sel)
+        case .add(let q):
+            ActionRow(icon: "plus.circle",
+                      title: "Add bookmark",
+                      subtitle: q,
+                      selected: sel)
         }
     }
 }
@@ -149,6 +171,9 @@ private struct Row: View {
     var favicon: NSImage? = nil
     var matchTokens: [String] = []
     var highlightColor: Color = .gray
+    var pendingDelete: Bool = false
+
+    private var light: Bool { selected || pendingDelete }
 
     /// URL without the scheme, for a cleaner secondary line. When an inline
     /// param is present the %s is filled in so the row shows the real target.
@@ -204,32 +229,75 @@ private struct Row: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .font(.system(size: 14))
-                    .foregroundStyle(selected ? Color.white : Color.primary)
+                    .foregroundStyle(light ? Color.white : Color.primary)
                 Text(highlighted(displayURL))
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .font(.system(size: 11))
-                    .foregroundStyle(selected ? Color.white.opacity(0.8) : Color.secondary)
+                    .foregroundStyle(light ? Color.white.opacity(0.85) : Color.secondary)
             }
 
             Spacer(minLength: 8)
 
-            ForEach(bookmark.aliases, id: \.self) { alias in
-                Text("@\(alias)")
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(selected ? Color.white : Color.orange)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        RoundedRectangle(cornerRadius: 5)
-                            .fill(Color.orange.opacity(selected ? 0.45 : 0.18))
-                    )
+            if pendingDelete {
+                Text("Delete?  ↩ confirm · esc cancel")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white)
+            } else {
+                ForEach(bookmark.aliases, id: \.self) { alias in
+                    Text("@\(alias)")
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(selected ? Color.white : Color.orange)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(Color.orange.opacity(selected ? 0.45 : 0.18))
+                        )
+                }
+                ForEach(bookmark.tags, id: \.self) { tag in
+                    Text("#\(tag)")
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(selected ? Color.white.opacity(0.85) : Color.secondary)
+                }
             }
-            ForEach(bookmark.tags, id: \.self) { tag in
-                Text("#\(tag)")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(selected ? Color.white.opacity(0.85) : Color.secondary)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 52)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(pendingDelete ? Color.red.opacity(0.9) : (selected ? Color.accentColor : Color.clear))
+        )
+    }
+}
+
+/// A non-bookmark action row (e.g. "Open all …", "Add bookmark").
+private struct ActionRow: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let selected: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(selected ? Color.white : Color.accentColor)
+                .frame(width: 16, height: 16)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(selected ? Color.white : Color.primary)
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .font(.system(size: 11))
+                        .foregroundStyle(selected ? Color.white.opacity(0.85) : Color.secondary)
+                }
             }
+            Spacer(minLength: 8)
         }
         .padding(.horizontal, 12)
         .frame(height: 52)
@@ -400,6 +468,158 @@ private struct SettingsView: View {
 
     private func openDocs() {
         if let u = URL(string: formatDocsURL) { NSWorkspace.shared.open(u) }
+    }
+}
+
+/// Add / edit a bookmark. Same panel for both; save appends or rewrites a line.
+private struct BookmarkFormView: View {
+    @ObservedObject var state: AppState
+    @FocusState private var focus: Field?
+    @State private var dupTitle: String?
+    @State private var aliasWarning: String?
+    @State private var fetching = false
+    @State private var debounce: DispatchWorkItem?
+
+    private enum Field { case url, title, tags, aliases }
+
+    private var canSave: Bool {
+        !state.formURL.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !state.formTitle.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: state.isEditing ? "pencil" : "plus.circle")
+                    .foregroundStyle(.secondary)
+                Text(state.isEditing ? "Edit bookmark" : "Add bookmark")
+                    .font(.system(size: 18, weight: .semibold))
+                Spacer()
+                Text("⌘↩ save · esc cancel")
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+            .padding(16)
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    labeled("URL") {
+                        HStack(spacing: 6) {
+                            if let img = state.favicons.image(forURL: state.formURL) {
+                                Image(nsImage: img).resizable().interpolation(.high)
+                                    .frame(width: 15, height: 15)
+                            }
+                            TextField("https://…", text: $state.formURL)
+                                .textFieldStyle(.roundedBorder).focused($focus, equals: .url)
+                        }
+                    }
+                    if let dup = dupTitle { warn("Already saved as “\(dup)”") }
+
+                    labeled("Title") {
+                        TextField(fetching ? "Fetching title…" : "Page title", text: $state.formTitle)
+                            .textFieldStyle(.roundedBorder).focused($focus, equals: .title)
+                    }
+                    labeled("Tags") {
+                        TextField("space separated", text: $state.formTags)
+                            .textFieldStyle(.roundedBorder).focused($focus, equals: .tags)
+                    }
+                    labeled("Aliases") {
+                        TextField("optional, space separated", text: $state.formAliases)
+                            .textFieldStyle(.roundedBorder).focused($focus, equals: .aliases)
+                    }
+                    if let aw = aliasWarning { warn(aw) }
+
+                    HStack {
+                        Spacer()
+                        Button(state.isEditing ? "Save" : "Add") { state.saveBookmark() }
+                            .disabled(!canSave)
+                            .keyboardShortcut(.return, modifiers: .command)
+                    }
+                }
+                .padding(16)
+            }
+        }
+        .onAppear {
+            evaluate()
+            updateAliasWarning()
+            // Focus after the fields are mounted, else the first responder
+            // doesn't take and keystrokes are dropped.
+            DispatchQueue.main.async { focus = state.formURL.isEmpty ? .url : .title }
+        }
+        .onChange(of: state.formURL) { _ in scheduleEvaluate() }
+        .onChange(of: state.formAliases) { _ in updateAliasWarning() }
+    }
+
+    @ViewBuilder private func labeled<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.system(size: 12)).foregroundStyle(.secondary)
+            content()
+        }
+    }
+
+    private func warn(_ msg: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: "exclamationmark.triangle.fill")
+            Text(msg)
+        }
+        .font(.system(size: 12))
+        .foregroundStyle(.orange)
+    }
+
+    private func scheduleEvaluate() {
+        debounce?.cancel()
+        let work = DispatchWorkItem { evaluate() }
+        debounce = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+    }
+
+    private func evaluate() {
+        let url = state.formURL.trimmingCharacters(in: .whitespaces)
+        guard url.hasPrefix("http://") || url.hasPrefix("https://") else { dupTitle = nil; return }
+        dupTitle = state.existingBookmark(url: url)?.title
+        state.favicons.load(forURL: url)
+        if state.formTags.trimmingCharacters(in: .whitespaces).isEmpty {
+            let sug = state.suggestedTags(url: url)
+            if !sug.isEmpty { state.formTags = sug.joined(separator: " ") }
+        }
+        if state.formTitle.trimmingCharacters(in: .whitespaces).isEmpty {
+            fetchTitle(url)
+        }
+    }
+
+    private func updateAliasWarning() {
+        let aliases = state.formAliases.split(separator: " ").map { $0.replacingOccurrences(of: "@", with: "") }
+        let used = state.aliasesInUse(aliases)
+        aliasWarning = used.isEmpty ? nil
+            : "\(used.map { "@\($0)" }.joined(separator: ", ")) already used — will open together"
+    }
+
+    private func fetchTitle(_ urlStr: String) {
+        guard let u = URL(string: urlStr) else { return }
+        fetching = true
+        URLSession.shared.dataTask(with: u) { data, _, _ in
+            let title = data.flatMap { Self.extractTitle($0) }
+            DispatchQueue.main.async {
+                fetching = false
+                if let title, state.formTitle.trimmingCharacters(in: .whitespaces).isEmpty {
+                    state.formTitle = title
+                }
+            }
+        }.resume()
+    }
+
+    private static func extractTitle(_ data: Data) -> String? {
+        guard let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1),
+              let re = try? NSRegularExpression(pattern: "<title[^>]*>([\\s\\S]*?)</title>", options: [.caseInsensitive]),
+              let m = re.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+              let gr = Range(m.range(at: 1), in: html) else { return nil }
+        var t = String(html[gr])
+        for (k, v) in ["&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&#39;": "'", "&nbsp;": " "] {
+            t = t.replacingOccurrences(of: k, with: v)
+        }
+        t = t.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        let trimmed = t.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 

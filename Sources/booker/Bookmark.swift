@@ -4,7 +4,8 @@ import Foundation
 /// Line format: `- [Title](url) #tag1 #tag2 @alias1 @alias2`
 /// URLs may contain a `%s` placeholder that is filled in at open time.
 struct Bookmark: Identifiable {
-    let id: Int          // stable index into the source file (used as identity)
+    let id: Int          // stable index among parsed bookmarks (identity for the UI)
+    let line: Int        // 0-based line number in the source file (for edit/delete)
     let title: String
     let url: String
     let tags: [String]
@@ -12,8 +13,9 @@ struct Bookmark: Identifiable {
 
     var needsParam: Bool { url.contains("%s") }
 
-    init(id: Int, title: String, url: String, tags: [String], aliases: [String]) {
+    init(id: Int, line: Int, title: String, url: String, tags: [String], aliases: [String]) {
         self.id = id
+        self.line = line
         self.title = title
         self.url = url
         self.tags = tags
@@ -51,9 +53,10 @@ enum BookmarkParser {
         }
         var result: [Bookmark] = []
         var index = 0
-        for rawLine in content.split(separator: "\n", omittingEmptySubsequences: true) {
-            let line = String(rawLine)
-            if let bm = parse(line: line, id: index) {
+        // Keep all lines (including blanks/comments) so `line` is the true file
+        // line number, which edit/delete rewrite precisely.
+        for (fileLine, rawLine) in content.components(separatedBy: "\n").enumerated() {
+            if let bm = parse(line: rawLine, id: index, fileLine: fileLine) {
                 result.append(bm)
                 index += 1
             }
@@ -62,7 +65,7 @@ enum BookmarkParser {
     }
 
     /// Parses one line. Returns nil for non-bookmark lines.
-    static func parse(line: String, id: Int) -> Bookmark? {
+    static func parse(line: String, id: Int, fileLine: Int = 0) -> Bookmark? {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard trimmed.hasPrefix("- [") else { return nil }
 
@@ -99,7 +102,48 @@ enum BookmarkParser {
             }
         }
 
-        return Bookmark(id: id, title: title, url: url, tags: tags, aliases: aliases)
+        return Bookmark(id: id, line: fileLine, title: title, url: url, tags: tags, aliases: aliases)
+    }
+
+    // MARK: - Writing
+
+    /// Renders a bookmark line: `- [Title](url) #tag @alias`.
+    static func format(title: String, url: String, tags: [String], aliases: [String]) -> String {
+        var s = "- [\(title)](\(url))"
+        for t in tags { s += " #\(t)" }
+        for a in aliases { s += " @\(a)" }
+        return s
+    }
+
+    /// Append a new bookmark line to the file (creating/terminating newlines).
+    static func append(_ line: String) {
+        var text = (try? String(contentsOfFile: filePath, encoding: .utf8)) ?? ""
+        if !text.isEmpty && !text.hasSuffix("\n") { text += "\n" }
+        text += line + "\n"
+        try? text.write(toFile: filePath, atomically: true, encoding: .utf8)
+    }
+
+    /// Replace the raw file line at `index` (leaves other lines untouched).
+    static func replaceLine(at index: Int, with newLine: String) {
+        rewrite { lines in
+            guard lines.indices.contains(index) else { return }
+            lines[index] = newLine
+        }
+    }
+
+    /// Remove the raw file line at `index`.
+    static func deleteLine(at index: Int) {
+        rewrite { lines in
+            guard lines.indices.contains(index) else { return }
+            lines.remove(at: index)
+        }
+    }
+
+    private static func rewrite(_ mutate: (inout [String]) -> Void) {
+        guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { return }
+        var lines = content.components(separatedBy: "\n")
+        mutate(&lines)
+        try? lines.joined(separator: "\n").write(toFile: filePath, atomically: true, encoding: .utf8)
     }
 
     /// Finds the index of the ')' in the last occurrence of ") #" or ") @",
