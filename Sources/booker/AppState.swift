@@ -43,6 +43,9 @@ final class AppState: ObservableObject {
     // Delete confirmation: id of the bookmark awaiting a confirm keypress.
     @Published var pendingDeleteID: Int?
 
+    // Measured natural height of the add/edit form, so the window can fit it.
+    @Published var formHeight: CGFloat = 0
+
     // Favicons.
     let favicons = FaviconStore()
 

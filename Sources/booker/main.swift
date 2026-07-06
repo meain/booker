@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// Borderless windows can't become key by default; allow it so the search
@@ -12,6 +13,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow!
     private let state: AppState
     private var monitor: Any?
+    private var cancellables = Set<AnyCancellable>()
+    /// Picker frame to restore after an overlay (settings/form) closes.
+    private var savedPickerFrame: NSRect?
+    private let settingsSize = NSSize(width: 640, height: 500)
+    private let formWidth: CGFloat = 600
 
     init(initialQuery: String) {
         self.state = AppState(initialQuery: initialQuery)
@@ -46,7 +52,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         window.setFrameAutosaveName(autosave)
 
+        installEditMenu()
         installKeyMonitor()
+        observeOverlaySize()
 
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
@@ -81,6 +89,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let x = frame.midX - size.width / 2
         let y = frame.midY - size.height / 2
         window.setFrameOrigin(NSPoint(x: x, y: y))
+    }
+
+    /// Resize the window when opening settings (default size) or the add/edit
+    /// form (exact fitted height); restore the picker size when both close.
+    private func observeOverlaySize() {
+        state.$showSettings.combineLatest(state.$showForm, state.$formHeight)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] settings, form, formHeight in
+                self?.applyOverlaySize(settings: settings, form: form, formHeight: formHeight)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func applyOverlaySize(settings: Bool, form: Bool, formHeight: CGFloat) {
+        if form || settings {
+            if savedPickerFrame == nil { savedPickerFrame = window.frame }
+            let size: NSSize
+            if form {
+                size = NSSize(width: formWidth, height: formHeight > 0 ? ceil(formHeight) : 360)
+            } else {
+                size = settingsSize
+            }
+            // Anchor the top edge and horizontal center so it grows downward.
+            let top = window.frame.maxY
+            let cx = window.frame.midX
+            let origin = NSPoint(x: cx - size.width / 2, y: top - size.height)
+            window.setFrame(NSRect(origin: origin, size: size), display: true)
+        } else if let f = savedPickerFrame {
+            window.setFrame(f, display: true)
+            savedPickerFrame = nil
+        }
+    }
+
+    /// A bare NSApplication has no menu, so the standard editing key equivalents
+    /// (⌘V/⌘C/⌘X/⌘A/⌘Z) don't reach text fields. Provide a minimal Edit menu.
+    private func installEditMenu() {
+        let mainMenu = NSMenu()
+        let editItem = NSMenuItem()
+        mainMenu.addItem(editItem)
+        let edit = NSMenu(title: "Edit")
+        editItem.submenu = edit
+        edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        edit.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        NSApp.mainMenu = mainMenu
     }
 
     private func installKeyMonitor() {

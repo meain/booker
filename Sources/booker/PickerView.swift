@@ -501,44 +501,46 @@ private struct BookmarkFormView: View {
             .padding(16)
             Divider()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    labeled("URL") {
-                        HStack(spacing: 6) {
-                            if let img = state.favicons.image(forURL: state.formURL) {
-                                Image(nsImage: img).resizable().interpolation(.high)
-                                    .frame(width: 15, height: 15)
-                            }
-                            TextField("https://…", text: $state.formURL)
-                                .textFieldStyle(.roundedBorder).focused($focus, equals: .url)
+            VStack(alignment: .leading, spacing: 12) {
+                labeled("URL") {
+                    HStack(spacing: 6) {
+                        if let img = state.favicons.image(forURL: state.formURL) {
+                            Image(nsImage: img).resizable().interpolation(.high)
+                                .frame(width: 16, height: 16)
                         }
-                    }
-                    if let dup = dupTitle { warn("Already saved as “\(dup)”") }
-
-                    labeled("Title") {
-                        TextField(fetching ? "Fetching title…" : "Page title", text: $state.formTitle)
-                            .textFieldStyle(.roundedBorder).focused($focus, equals: .title)
-                    }
-                    labeled("Tags") {
-                        TextField("space separated", text: $state.formTags)
-                            .textFieldStyle(.roundedBorder).focused($focus, equals: .tags)
-                    }
-                    labeled("Aliases") {
-                        TextField("optional, space separated", text: $state.formAliases)
-                            .textFieldStyle(.roundedBorder).focused($focus, equals: .aliases)
-                    }
-                    if let aw = aliasWarning { warn(aw) }
-
-                    HStack {
-                        Spacer()
-                        Button(state.isEditing ? "Save" : "Add") { state.saveBookmark() }
-                            .disabled(!canSave)
-                            .keyboardShortcut(.return, modifiers: .command)
+                        field("https://…", text: $state.formURL, field: .url)
                     }
                 }
-                .padding(16)
+                if let dup = dupTitle { warn("Already saved as “\(dup)”") }
+
+                labeled("Title") {
+                    field(fetching ? "Fetching title…" : "Page title", text: $state.formTitle, field: .title)
+                }
+                labeled("Tags") {
+                    field("space separated", text: $state.formTags, field: .tags)
+                }
+                labeled("Aliases") {
+                    field("optional, space separated", text: $state.formAliases, field: .aliases)
+                }
+                if let aw = aliasWarning { warn(aw) }
+
+                HStack {
+                    Spacer()
+                    Button(state.isEditing ? "Save" : "Add") { state.saveBookmark() }
+                        .controlSize(.large)
+                        .disabled(!canSave)
+                        .keyboardShortcut(.return, modifiers: .command)
+                }
             }
+            .padding(16)
         }
+        .background(GeometryReader { g -> Color in
+            let h = g.size.height
+            DispatchQueue.main.async {
+                if abs(state.formHeight - h) > 0.5 { state.formHeight = h }
+            }
+            return Color.clear
+        })
         .onAppear {
             evaluate()
             updateAliasWarning()
@@ -548,6 +550,14 @@ private struct BookmarkFormView: View {
         }
         .onChange(of: state.formURL) { _ in scheduleEvaluate() }
         .onChange(of: state.formAliases) { _ in updateAliasWarning() }
+    }
+
+    private func field(_ prompt: String, text: Binding<String>, field: Field) -> some View {
+        TextField(prompt, text: text)
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.large)
+            .font(.system(size: 14))
+            .focused($focus, equals: field)
     }
 
     @ViewBuilder private func labeled<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
