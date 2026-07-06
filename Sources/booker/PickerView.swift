@@ -124,7 +124,11 @@ struct PickerView: View {
                     }
                 }
                 .padding(6)
+                .overlay(alignment: .topLeading) {
+                    AlwaysOnScroller().frame(width: 0, height: 0)
+                }
             }
+            .scrollIndicators(.visible)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onChange(of: state.selected) { newValue in
                 withAnimation(.easeOut(duration: 0.08)) {
@@ -394,6 +398,29 @@ private struct SettingsView: View {
 
     private func openDocs() {
         if let u = URL(string: formatDocsURL) { NSWorkspace.shared.open(u) }
+    }
+}
+
+/// Forces the enclosing `NSScrollView` to keep a persistent (non-autohiding)
+/// scroller so the scrollbar is present from the first frame instead of fading
+/// in after load. Configures as the view enters the window (pre-display).
+private final class ScrollerConfigView: NSView {
+    private func configure() {
+        guard let sv = enclosingScrollView else { return }
+        sv.scrollerStyle = .legacy
+        sv.hasVerticalScroller = true
+        sv.autohidesScrollers = false
+        sv.verticalScroller?.alphaValue = 1
+    }
+    override func viewDidMoveToSuperview() { super.viewDidMoveToSuperview(); configure() }
+    override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); configure() }
+    override func layout() { super.layout(); configure() }
+}
+
+private struct AlwaysOnScroller: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { ScrollerConfigView(frame: .zero) }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        (nsView as? ScrollerConfigView)?.needsLayout = true
     }
 }
 
