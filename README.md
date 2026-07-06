@@ -67,6 +67,41 @@ to open. Or pick it with no value to get prompted.
   URL search, toggle favicons, pick the match-highlight colour, reset the
   frecency index, clear the favicon cache, and open the format docs.
 
+## Example use-cases
+
+- **Keyboard site launcher** — alias your daily sites and jump by muscle memory.
+  ```
+  - [GitHub](https://github.com/) #dev @gh
+  - [Gmail](https://mail.google.com/) @mail
+  ```
+  Type `@gh`, hit Enter. Frecency keeps your most-used ones on top for a blank query.
+
+- **Issue / ticket jumper** — a `%s` bookmark plus the inline value opens the exact page:
+  ```
+  - [Jira issue](https://acme.atlassian.net/browse/PROJ-%s) #work @jira
+  - [PR by number](https://github.com/acme/app/pull/%s) #work @pr
+  ```
+  Type `jira 4821` → opens `…/PROJ-4821`; `pr 210` → that pull request.
+
+- **Search shortcuts** — put the query in the URL:
+  ```
+  - [Wikipedia](https://en.wikipedia.org/wiki/%s) @w
+  - [npm](https://www.npmjs.com/search?q=%s) #dev @npm
+  ```
+  `w Ada Lovelace` → the article; `npm zod` → the search.
+
+- **"Open all" a group** — one alias on several bookmarks opens them together:
+  ```
+  - [Prod dashboard](https://…/prod) #dash @dash
+  - [Staging dashboard](https://…/staging) #dash @dash
+  - [Logs](https://…/logs) #dash @dash
+  ```
+  Type `@dash` → **Open all 3 · @dash** launches your whole monitoring set at once.
+
+- **Per-context bookmark files** — point Settings (or `$BM_FILE`) at a
+  project-specific file, e.g. `~/work/project/.bookmarks.md`, to swap the whole
+  set when you switch contexts.
+
 ## Screenshots
 
 Fuzzy search with matched text highlighted:
