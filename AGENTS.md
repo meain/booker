@@ -47,9 +47,11 @@ swift build                      # dev binary at ./.build/debug/booker
 make lint                        # swift-format lint (config .swift-format, 4-space); make format to fix
 ```
 
-The Swift compiler comes from the system Xcode toolchain (nixpkgs Swift on macOS
-is unreliable). `flake.nix` provides a devShell with `swift-format` (the linter);
-`nix develop` then build with the system `swift`.
+The whole toolchain comes from nix: `flake.nix` provides a devShell with `swift`
++ `swiftpm` (currently Swift 5.10.1, with the matching Apple SDK whose setup hook
+exports `SDKROOT`/`DEVELOPER_DIR`) and `swift-format` (the linter). Run
+`nix develop`, then `swift build` / `./build-app.sh`. Don't mix the system Xcode
+Swift with the nix SDK — the versions differ and the compiler rejects the SDK.
 
 CI (`.github/workflows/`): **ci.yml** lints (`swift format lint --strict`) + builds
 on push/PR to `main`; **release.yml** builds `Booker.app`, zips it, and creates a
