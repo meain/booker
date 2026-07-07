@@ -530,6 +530,8 @@ private struct BookmarkFormView: View {
                 }
                 if let aw = aliasWarning { warn(aw) }
 
+                if state.canGenerateShortcuts { githubShortcuts }
+
                 HStack {
                     Spacer()
                     Button(state.isEditing ? "Save" : "Add") { state.saveBookmark() }
@@ -558,6 +560,50 @@ private struct BookmarkFormView: View {
         }
         .onChange(of: state.formURL) { _ in scheduleEvaluate() }
         .onChange(of: state.formAliases) { _ in updateAliasWarning() }
+    }
+
+    /// GitHub-repo affordance: a master toggle that, when on, reveals a
+    /// checklist of derived bookmarks (issues, PRs, actions, …) to create
+    /// alongside the repo, each aliased `<base><suffix>`.
+    @ViewBuilder private var githubShortcuts: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: $state.formGenerate) {
+                Text("Also create GitHub shortcuts")
+                    .font(.system(size: 13))
+            }
+            .toggleStyle(.switch)
+
+            if state.formGenerate {
+                if let base = state.baseAlias {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Github.shortcuts) { sc in
+                            Toggle(isOn: genBinding(sc.aliasSuffix)) {
+                                HStack(spacing: 6) {
+                                    Text(sc.label)
+                                        .font(.system(size: 12))
+                                    Text("@\(base)\(sc.aliasSuffix)")
+                                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                        .foregroundStyle(.orange)
+                                }
+                            }
+                            .toggleStyle(.checkbox)
+                        }
+                    }
+                    .padding(.leading, 4)
+                } else {
+                    warn("Add an alias above to prefix the shortcuts")
+                }
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    private func genBinding(_ suffix: String) -> Binding<Bool> {
+        Binding(
+            get: { state.genEnabled.contains(suffix) },
+            set: { on in
+                if on { state.genEnabled.insert(suffix) } else { state.genEnabled.remove(suffix) }
+            })
     }
 
     private func field(_ prompt: String, text: Binding<String>, field: Field) -> some View {

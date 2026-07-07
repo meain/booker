@@ -37,6 +37,10 @@ final class AppState: ObservableObject {
     @Published var formTitle: String = ""
     @Published var formTags: String = ""
     @Published var formAliases: String = ""
+    /// When adding a GitHub repo, also write the enabled derived bookmarks below.
+    @Published var formGenerate: Bool = false
+    /// Alias suffixes of the GitHub shortcuts currently ticked.
+    @Published var genEnabled: Set<String> = Set(Github.shortcuts.map { $0.aliasSuffix })
     /// File line being edited; nil means a new bookmark (append).
     private var editingLine: Int?
 
@@ -329,6 +333,8 @@ final class AppState: ObservableObject {
             formURL = ""; formTitle = s
         }
         formTags = ""; formAliases = ""
+        formGenerate = false
+        genEnabled = Set(Github.shortcuts.map { $0.aliasSuffix })
         showForm = true
     }
 
@@ -340,10 +346,40 @@ final class AppState: ObservableObject {
         formTitle = bm.title
         formTags = bm.tags.joined(separator: " ")
         formAliases = bm.aliases.joined(separator: " ")
+        formGenerate = false  // generated shortcuts are an add-only affordance
         showForm = true
     }
 
     var isEditing: Bool { editingLine != nil }
+
+    /// True when the form URL is a GitHub repo root and we're adding (not
+    /// editing) — i.e. generated shortcuts can be offered.
+    var canGenerateShortcuts: Bool { !isEditing && Github.repoSlug(formURL) != nil }
+
+    /// First alias in the aliases field; generated shortcut aliases prefix with
+    /// it (`<base><suffix>`). Nil when no alias is entered.
+    var baseAlias: String? {
+        formAliases.split(separator: " ").first.map { $0.replacingOccurrences(of: "@", with: "") }
+            .flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// The bookmark lines for the currently-enabled GitHub shortcuts, given the
+    /// main bookmark's title/tags/aliases. Empty unless generation applies.
+    private func generatedLines(title: String, tags: [String]) -> [String] {
+        guard formGenerate, canGenerateShortcuts,
+            let slug = Github.repoSlug(formURL), let base = baseAlias
+        else { return [] }
+        let repoURL = "https://github.com/\(slug)"
+        return Github.shortcuts
+            .filter { genEnabled.contains($0.aliasSuffix) }
+            .map { sc in
+                BookmarkParser.format(
+                    title: "\(title) · \(sc.titleSuffix)",
+                    url: repoURL + sc.path,
+                    tags: tags,
+                    aliases: [base + sc.aliasSuffix])
+            }
+    }
 
     func closeForm() {
         showForm = false
@@ -387,6 +423,9 @@ final class AppState: ObservableObject {
             BookmarkParser.replaceLine(at: editingLine, with: line)
         } else {
             BookmarkParser.append(line)
+            for extra in generatedLines(title: title, tags: tags) {
+                BookmarkParser.append(extra)
+            }
         }
         showForm = false
         query = ""

@@ -97,6 +97,27 @@ booker can modify the file directly:
 Title and URL are required. Edits rewrite exactly that one line; comments, blank
 lines, and everything else in the file are preserved.
 
+## GitHub shortcuts
+
+When the URL you're adding is a GitHub repo root (`github.com/owner/repo`), the
+add form shows an **Also create GitHub shortcuts** toggle. Turn it on to also
+create a set of derived bookmarks for the repo, each ticked individually:
+
+- **Issues** — `<alias>i`
+- **Issues by me** — `<alias>im`
+- **Pull requests** — `<alias>p`
+- **PRs by me** — `<alias>pm`
+- **PRs by me, merged** — `<alias>pmm`
+- **PRs to review** — `<alias>pr`
+- **Actions** — `<alias>a`
+- **Releases** — `<alias>rel`
+
+Each shortcut's alias is your first alias plus the suffix above, its title is the
+repo title plus a suffix (e.g. `booker · Issues`), and it inherits the repo's
+tags. The "by me" / "to review" searches use GitHub's `@me` token, so they
+resolve to whoever is signed in. You need to enter at least one alias for the
+repo — it's the prefix the shortcut aliases are built from.
+
 ## File location
 
 booker resolves the bookmarks file in this order:
