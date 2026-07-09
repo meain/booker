@@ -693,15 +693,24 @@ private struct BookmarkFormView: View {
         fetching = true
         var req = URLRequest(url: u)
         req.timeoutInterval = 5
-        URLSession.shared.dataTask(with: req) { data, _, _ in
-            let title = data.flatMap { Self.extractTitle($0) }
-            DispatchQueue.main.async {
+        Task {
+            var buffer = Data()
+            let limit = 16384
+            do {
+                let (bytes, _) = try await URLSession.shared.bytes(for: req)
+                for try await byte in bytes {
+                    buffer.append(byte)
+                    if buffer.count >= limit { break }
+                }
+            } catch {}
+            let title = Self.extractTitle(buffer)
+            await MainActor.run {
                 fetching = false
                 if let title, state.formTitle.trimmingCharacters(in: .whitespaces).isEmpty {
                     state.formTitle = title
                 }
             }
-        }.resume()
+        }
     }
 
     private static func extractTitle(_ data: Data) -> String? {
