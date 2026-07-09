@@ -63,7 +63,9 @@ final class FaviconStore: ObservableObject {
             publish(host: host, image: nil)
             return
         }
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 5
+        URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
             var image: NSImage?
             if let data = data, !data.isEmpty, let img = NSImage(data: data) {
                 image = img

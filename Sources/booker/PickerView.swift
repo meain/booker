@@ -663,7 +663,9 @@ private struct BookmarkFormView: View {
     private func fetchTitle(_ urlStr: String) {
         guard let u = URL(string: urlStr) else { return }
         fetching = true
-        URLSession.shared.dataTask(with: u) { data, _, _ in
+        var req = URLRequest(url: u)
+        req.timeoutInterval = 5
+        URLSession.shared.dataTask(with: req) { data, _, _ in
             let title = data.flatMap { Self.extractTitle($0) }
             DispatchQueue.main.async {
                 fetching = false
