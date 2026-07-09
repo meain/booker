@@ -14,7 +14,7 @@ final class Frecency {
     init() {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let dir = home + "/.local/share/booker"
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        FileManager.default.ensureDirectory(atPath: dir)
         self.path = dir + "/frecency.json"
 
         if let data = FileManager.default.contents(atPath: path),

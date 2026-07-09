@@ -13,13 +13,12 @@ final class FaviconStore: ObservableObject {
     init() {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         self.dir = home + "/.local/share/booker/favicons"
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        FileManager.default.ensureDirectory(atPath: dir)
     }
 
     /// Host portion of a bookmark URL (handles `%s` placeholders and fragments).
     static func host(_ urlString: String) -> String? {
-        var t = urlString
-        for p in ["https://", "http://"] where t.hasPrefix(p) { t.removeFirst(p.count) }
+        let t = urlString.strippingURLScheme()
         let end = t.firstIndex(where: { $0 == "/" || $0 == "?" || $0 == "#" }) ?? t.endIndex
         let host = String(t[t.startIndex..<end])
         return host.isEmpty ? nil : host
@@ -49,7 +48,7 @@ final class FaviconStore: ObservableObject {
         images = [:]
         inFlight = []
         try? FileManager.default.removeItem(atPath: dir)
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        FileManager.default.ensureDirectory(atPath: dir)
     }
 
     // MARK: - Private

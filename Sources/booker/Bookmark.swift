@@ -1,5 +1,24 @@
 import Foundation
 
+// MARK: - Shared helpers
+
+extension String {
+    /// Returns the string with a leading `https://` or `http://` scheme removed.
+    func strippingURLScheme() -> String {
+        for prefix in ["https://", "http://"] where hasPrefix(prefix) {
+            return String(dropFirst(prefix.count))
+        }
+        return self
+    }
+}
+
+extension FileManager {
+    /// Creates `path` and any intermediate directories, ignoring errors (e.g. already exists).
+    func ensureDirectory(atPath path: String) {
+        try? createDirectory(atPath: path, withIntermediateDirectories: true)
+    }
+}
+
 /// A single bookmark parsed from the markdown file.
 /// Line format: `- [Title](url) #tag1 #tag2 @alias1 @alias2`
 /// URLs may contain a `%s` placeholder that is filled in at open time.

@@ -17,8 +17,7 @@ enum Github {
     /// "owner/repo". Deeper paths (issues, blob, …), the site root, and reserved
     /// first segments (orgs, settings, …) return nil.
     static func repoSlug(_ url: String) -> String? {
-        var s = url.trimmingCharacters(in: .whitespaces)
-        for p in ["https://", "http://"] where s.hasPrefix(p) { s.removeFirst(p.count) }
+        var s = url.trimmingCharacters(in: .whitespaces).strippingURLScheme()
         guard s.hasPrefix("github.com/") else { return nil }
         s.removeFirst("github.com/".count)
         if s.hasSuffix("/") { s.removeLast() }
