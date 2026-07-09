@@ -50,6 +50,9 @@ struct PickerView: View {
                 VStack(spacing: 0) {
                     searchField
                     Divider()
+                    if let msg = state.errorMessage {
+                        errorBanner(msg)
+                    }
                     resultsList
                 }
                 .onChange(of: state.query) { _ in state.refilter() }
@@ -90,6 +93,31 @@ struct PickerView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
+    }
+
+    private func errorBanner(_ message: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 13))
+            Text(message)
+                .font(.system(size: 13))
+                .lineLimit(2)
+            Spacer(minLength: 8)
+            Button(action: { state.errorMessage = nil }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .buttonStyle(.plain)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Color.orange.opacity(0.9))
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                state.errorMessage = nil
+            }
+        }
     }
 
     private var resultsList: some View {

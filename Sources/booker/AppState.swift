@@ -50,6 +50,9 @@ final class AppState: ObservableObject {
     // Measured natural height of the add/edit form, so the window can fit it.
     @Published var formHeight: CGFloat = 0
 
+    // Error banner: set when a file write fails, cleared after display.
+    @Published var errorMessage: String? = nil
+
     // Favicons.
     let favicons = FaviconStore()
 
@@ -419,13 +422,18 @@ final class AppState: ObservableObject {
         let aliases = formAliases.split(separator: " ").map { $0.replacingOccurrences(of: "@", with: "") }
         let line = BookmarkParser.format(title: title, url: url, tags: tags, aliases: aliases)
 
-        if let editingLine = editingLine {
-            BookmarkParser.replaceLine(at: editingLine, with: line)
-        } else {
-            BookmarkParser.append(line)
-            for extra in generatedLines(title: title, tags: tags) {
-                BookmarkParser.append(extra)
+        do {
+            if let editingLine = editingLine {
+                try BookmarkParser.replaceLine(at: editingLine, with: line)
+            } else {
+                try BookmarkParser.append(line)
+                for extra in generatedLines(title: title, tags: tags) {
+                    try BookmarkParser.append(extra)
+                }
             }
+        } catch {
+            errorMessage = "Could not save: \(error.localizedDescription)"
+            return false
         }
         showForm = false
         query = ""
@@ -444,7 +452,12 @@ final class AppState: ObservableObject {
             let bm = bookmarks.first(where: { $0.id == id })
         else { return }
         pendingDeleteID = nil
-        BookmarkParser.deleteLine(at: bm.line)
+        do {
+            try BookmarkParser.deleteLine(at: bm.line)
+        } catch {
+            errorMessage = "Could not save: \(error.localizedDescription)"
+            return
+        }
         reloadBookmarks()
     }
 }

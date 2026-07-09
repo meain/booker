@@ -116,34 +116,34 @@ enum BookmarkParser {
     }
 
     /// Append a new bookmark line to the file (creating/terminating newlines).
-    static func append(_ line: String) {
+    static func append(_ line: String) throws {
         var text = (try? String(contentsOfFile: filePath, encoding: .utf8)) ?? ""
         if !text.isEmpty && !text.hasSuffix("\n") { text += "\n" }
         text += line + "\n"
-        try? text.write(toFile: filePath, atomically: true, encoding: .utf8)
+        try text.write(toFile: filePath, atomically: true, encoding: .utf8)
     }
 
     /// Replace the raw file line at `index` (leaves other lines untouched).
-    static func replaceLine(at index: Int, with newLine: String) {
-        rewrite { lines in
+    static func replaceLine(at index: Int, with newLine: String) throws {
+        try rewrite { lines in
             guard lines.indices.contains(index) else { return }
             lines[index] = newLine
         }
     }
 
     /// Remove the raw file line at `index`.
-    static func deleteLine(at index: Int) {
-        rewrite { lines in
+    static func deleteLine(at index: Int) throws {
+        try rewrite { lines in
             guard lines.indices.contains(index) else { return }
             lines.remove(at: index)
         }
     }
 
-    private static func rewrite(_ mutate: (inout [String]) -> Void) {
+    private static func rewrite(_ mutate: (inout [String]) -> Void) throws {
         guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { return }
         var lines = content.components(separatedBy: "\n")
         mutate(&lines)
-        try? lines.joined(separator: "\n").write(toFile: filePath, atomically: true, encoding: .utf8)
+        try lines.joined(separator: "\n").write(toFile: filePath, atomically: true, encoding: .utf8)
     }
 
     /// Finds the index of the ')' in the last occurrence of ") #" or ") @",
