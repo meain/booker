@@ -1,6 +1,16 @@
 import AppKit
 import SwiftUI
 
+/// Initial values seeded into BookmarkFormView when it opens.
+struct FormSeed {
+    var url: String
+    var title: String
+    var tags: String
+    var aliases: String
+
+    static let empty = FormSeed(url: "", title: "", tags: "", aliases: "")
+}
+
 /// A row in the results list: a matched bookmark, an "open all" group for a
 /// shared alias, or an "add this URL" affordance.
 enum ResultRow: Identifiable {
@@ -33,16 +43,10 @@ final class AppState: ObservableObject {
 
     // Add/edit form.
     @Published var showForm: Bool = false
-    @Published var formURL: String = ""
-    @Published var formTitle: String = ""
-    @Published var formTags: String = ""
-    @Published var formAliases: String = ""
-    /// When adding a GitHub repo, also write the enabled derived bookmarks below.
-    @Published var formGenerate: Bool = false
-    /// Alias suffixes of the GitHub shortcuts currently ticked.
-    @Published var genEnabled: Set<String> = Set(Github.shortcuts.map { $0.aliasSuffix })
+    /// Seed values populated when the form opens; read once by BookmarkFormView on appear.
+    private(set) var formSeed: FormSeed = .empty
     /// File line being edited; nil means a new bookmark (append).
-    private var editingLine: Int?
+    private(set) var editingLine: Int?
 
     // Delete confirmation: id of the bookmark awaiting a confirm keypress.
     @Published var pendingDeleteID: Int?
@@ -331,13 +335,10 @@ final class AppState: ObservableObject {
         editingLine = nil
         let s = seed.trimmingCharacters(in: .whitespaces)
         if looksLikeURL(s) {
-            formURL = s; formTitle = ""
+            formSeed = FormSeed(url: s, title: "", tags: "", aliases: "")
         } else {
-            formURL = ""; formTitle = s
+            formSeed = FormSeed(url: "", title: s, tags: "", aliases: "")
         }
-        formTags = ""; formAliases = ""
-        formGenerate = false
-        genEnabled = Set(Github.shortcuts.map { $0.aliasSuffix })
         showForm = true
     }
 
@@ -345,44 +346,15 @@ final class AppState: ObservableObject {
     func openEditForm() {
         guard let bm = selectedBookmark else { return }
         editingLine = bm.line
-        formURL = bm.url
-        formTitle = bm.title
-        formTags = bm.tags.joined(separator: " ")
-        formAliases = bm.aliases.joined(separator: " ")
-        formGenerate = false  // generated shortcuts are an add-only affordance
+        formSeed = FormSeed(
+            url: bm.url,
+            title: bm.title,
+            tags: bm.tags.joined(separator: " "),
+            aliases: bm.aliases.joined(separator: " "))
         showForm = true
     }
 
     var isEditing: Bool { editingLine != nil }
-
-    /// True when the form URL is a GitHub repo root and we're adding (not
-    /// editing) — i.e. generated shortcuts can be offered.
-    var canGenerateShortcuts: Bool { !isEditing && Github.repoSlug(formURL) != nil }
-
-    /// First alias in the aliases field; generated shortcut aliases prefix with
-    /// it (`<base><suffix>`). Nil when no alias is entered.
-    var baseAlias: String? {
-        formAliases.split(separator: " ").first.map { $0.replacingOccurrences(of: "@", with: "") }
-            .flatMap { $0.isEmpty ? nil : $0 }
-    }
-
-    /// The bookmark lines for the currently-enabled GitHub shortcuts, given the
-    /// main bookmark's title/tags/aliases. Empty unless generation applies.
-    private func generatedLines(title: String, tags: [String]) -> [String] {
-        guard formGenerate, canGenerateShortcuts,
-            let slug = Github.repoSlug(formURL), let base = baseAlias
-        else { return [] }
-        let repoURL = "https://github.com/\(slug)"
-        return Github.shortcuts
-            .filter { genEnabled.contains($0.aliasSuffix) }
-            .map { sc in
-                BookmarkParser.format(
-                    title: "\(title) · \(sc.titleSuffix)",
-                    url: repoURL + sc.path,
-                    tags: tags,
-                    aliases: [base + sc.aliasSuffix])
-            }
-    }
 
     func closeForm() {
         showForm = false
@@ -414,7 +386,9 @@ final class AppState: ObservableObject {
     /// Save the form. Title and URL are required. Appends, or rewrites the line
     /// when editing. Returns false if invalid.
     @discardableResult
-    func saveBookmark() -> Bool {
+    func saveBookmark(url formURL: String, title formTitle: String, tags formTags: String,
+        aliases formAliases: String, generate formGenerate: Bool, genEnabled: Set<String>) -> Bool
+    {
         let title = formTitle.trimmingCharacters(in: .whitespaces)
         let url = formURL.trimmingCharacters(in: .whitespaces)
         guard !title.isEmpty, !url.isEmpty else { return false }
@@ -422,12 +396,33 @@ final class AppState: ObservableObject {
         let aliases = formAliases.split(separator: " ").map { $0.replacingOccurrences(of: "@", with: "") }
         let line = BookmarkParser.format(title: title, url: url, tags: tags, aliases: aliases)
 
+        let canGenerateShortcuts = !isEditing && Github.repoSlug(url) != nil
+        let baseAlias = formAliases.split(separator: " ").first
+            .map { $0.replacingOccurrences(of: "@", with: "") }
+            .flatMap { $0.isEmpty ? nil : $0 }
+
+        func generatedLines() -> [String] {
+            guard formGenerate, canGenerateShortcuts,
+                let slug = Github.repoSlug(url), let base = baseAlias
+            else { return [] }
+            let repoURL = "https://github.com/\(slug)"
+            return Github.shortcuts
+                .filter { genEnabled.contains($0.aliasSuffix) }
+                .map { sc in
+                    BookmarkParser.format(
+                        title: "\(title) · \(sc.titleSuffix)",
+                        url: repoURL + sc.path,
+                        tags: tags,
+                        aliases: [base + sc.aliasSuffix])
+                }
+        }
+
         do {
             if let editingLine = editingLine {
                 try BookmarkParser.replaceLine(at: editingLine, with: line)
             } else {
                 try BookmarkParser.append(line)
-                for extra in generatedLines(title: title, tags: tags) {
+                for extra in generatedLines() {
                     try BookmarkParser.append(extra)
                 }
             }

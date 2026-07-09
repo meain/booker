@@ -510,15 +510,39 @@ private struct SettingsView: View {
 private struct BookmarkFormView: View {
     @ObservedObject var state: AppState
     @FocusState private var focus: Field?
+
+    // Transient form state — lives only for the lifetime of this view.
+    @State private var formURL: String = ""
+    @State private var formTitle: String = ""
+    @State private var formTags: String = ""
+    @State private var formAliases: String = ""
+    @State private var formGenerate: Bool = false
+    @State private var genEnabled: Set<String> = Set(Github.shortcuts.map { $0.aliasSuffix })
+
     @State private var dupTitle: String?
     @State private var aliasWarning: String?
+    @State private var aliasValidationError: String?
+    @State private var tagValidationError: String?
     @State private var fetching = false
     @State private var debounce: DispatchWorkItem?
 
     private enum Field { case url, title, tags, aliases }
 
     private var canSave: Bool {
-        !state.formURL.trimmingCharacters(in: .whitespaces).isEmpty && !state.formTitle.trimmingCharacters(in: .whitespaces).isEmpty
+        !formURL.trimmingCharacters(in: .whitespaces).isEmpty
+            && !formTitle.trimmingCharacters(in: .whitespaces).isEmpty
+            && aliasValidationError == nil
+            && tagValidationError == nil
+    }
+
+    /// True when the form URL is a GitHub repo root and we're adding (not editing).
+    private var canGenerateShortcuts: Bool { !state.isEditing && Github.repoSlug(formURL) != nil }
+
+    /// First alias entered; used as the base for GitHub shortcut aliases.
+    private var baseAlias: String? {
+        formAliases.split(separator: " ").first
+            .map { $0.replacingOccurrences(of: "@", with: "") }
+            .flatMap { $0.isEmpty ? nil : $0 }
     }
 
     var body: some View {
@@ -538,34 +562,41 @@ private struct BookmarkFormView: View {
             VStack(alignment: .leading, spacing: 12) {
                 labeled("URL") {
                     HStack(spacing: 6) {
-                        if let img = state.favicons.image(forURL: state.formURL) {
+                        if let img = state.favicons.image(forURL: formURL) {
                             Image(nsImage: img).resizable().interpolation(.high)
                                 .frame(width: 16, height: 16)
                         }
-                        field("https://…", text: $state.formURL, field: .url)
+                        field("https://…", text: $formURL, field: .url)
                     }
                 }
-                if let dup = dupTitle { warn("Already saved as “\(dup)”") }
+                if let dup = dupTitle { warn("Already saved as \"\(dup)\"") }
 
                 labeled("Title") {
-                    field(fetching ? "Fetching title…" : "Page title", text: $state.formTitle, field: .title)
+                    field(fetching ? "Fetching title…" : "Page title", text: $formTitle, field: .title)
                 }
                 labeled("Tags") {
-                    field("space separated", text: $state.formTags, field: .tags)
+                    field("space separated", text: $formTags, field: .tags)
                 }
-                labeled("Aliases") {
-                    field("optional, space separated", text: $state.formAliases, field: .aliases)
-                }
-                if let aw = aliasWarning { warn(aw) }
+                if let tv = tagValidationError { validationError(tv) }
 
-                if state.canGenerateShortcuts { githubShortcuts }
+                labeled("Aliases") {
+                    field("optional, space separated", text: $formAliases, field: .aliases)
+                }
+                if let av = aliasValidationError { validationError(av) }
+                else if let aw = aliasWarning { warn(aw) }
+
+                if canGenerateShortcuts { githubShortcuts }
 
                 HStack {
                     Spacer()
-                    Button(state.isEditing ? "Save" : "Add") { state.saveBookmark() }
-                        .controlSize(.large)
-                        .disabled(!canSave)
-                        .keyboardShortcut(.return, modifiers: .command)
+                    Button(state.isEditing ? "Save" : "Add") {
+                        state.saveBookmark(
+                            url: formURL, title: formTitle, tags: formTags,
+                            aliases: formAliases, generate: formGenerate, genEnabled: genEnabled)
+                    }
+                    .controlSize(.large)
+                    .disabled(!canSave)
+                    .keyboardShortcut(.return, modifiers: .command)
                 }
             }
             .padding(16)
@@ -580,14 +611,23 @@ private struct BookmarkFormView: View {
             }
         )
         .onAppear {
+            // Seed fields from the values AppState populated when opening the form.
+            formURL = state.formSeed.url
+            formTitle = state.formSeed.title
+            formTags = state.formSeed.tags
+            formAliases = state.formSeed.aliases
+            formGenerate = false
+            genEnabled = Set(Github.shortcuts.map { $0.aliasSuffix })
             evaluate()
             updateAliasWarning()
+            updateValidation()
             // Focus after the fields are mounted, else the first responder
             // doesn't take and keystrokes are dropped.
-            DispatchQueue.main.async { focus = state.formURL.isEmpty ? .url : .title }
+            DispatchQueue.main.async { focus = formURL.isEmpty ? .url : .title }
         }
-        .onChange(of: state.formURL) { _ in scheduleEvaluate() }
-        .onChange(of: state.formAliases) { _ in updateAliasWarning() }
+        .onChange(of: formURL) { _ in scheduleEvaluate() }
+        .onChange(of: formAliases) { _ in updateAliasWarning(); updateValidation() }
+        .onChange(of: formTags) { _ in updateValidation() }
     }
 
     /// GitHub-repo affordance: a master toggle that, when on, reveals a
@@ -595,14 +635,14 @@ private struct BookmarkFormView: View {
     /// alongside the repo, each aliased `<base><suffix>`.
     @ViewBuilder private var githubShortcuts: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Toggle(isOn: $state.formGenerate) {
+            Toggle(isOn: $formGenerate) {
                 Text("Also create GitHub shortcuts")
                     .font(.system(size: 13))
             }
             .toggleStyle(.switch)
 
-            if state.formGenerate {
-                if let base = state.baseAlias {
+            if formGenerate {
+                if let base = baseAlias {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(Github.shortcuts) { sc in
                             Toggle(isOn: genBinding(sc.aliasSuffix)) {
@@ -628,9 +668,9 @@ private struct BookmarkFormView: View {
 
     private func genBinding(_ suffix: String) -> Binding<Bool> {
         Binding(
-            get: { state.genEnabled.contains(suffix) },
+            get: { genEnabled.contains(suffix) },
             set: { on in
-                if on { state.genEnabled.insert(suffix) } else { state.genEnabled.remove(suffix) }
+                if on { genEnabled.insert(suffix) } else { genEnabled.remove(suffix) }
             })
     }
 
@@ -658,6 +698,15 @@ private struct BookmarkFormView: View {
         .foregroundStyle(.orange)
     }
 
+    private func validationError(_ msg: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: "exclamationmark.triangle.fill")
+            Text(msg)
+        }
+        .font(.system(size: 12))
+        .foregroundStyle(.red)
+    }
+
     private func scheduleEvaluate() {
         debounce?.cancel()
         let work = DispatchWorkItem { evaluate() }
@@ -666,26 +715,55 @@ private struct BookmarkFormView: View {
     }
 
     private func evaluate() {
-        let url = state.formURL.trimmingCharacters(in: .whitespaces)
+        let url = formURL.trimmingCharacters(in: .whitespaces)
         guard url.hasPrefix("http://") || url.hasPrefix("https://") else { dupTitle = nil; return }
         dupTitle = state.existingBookmark(url: url)?.title
         state.favicons.load(forURL: url)
-        if state.formTags.trimmingCharacters(in: .whitespaces).isEmpty {
+        if formTags.trimmingCharacters(in: .whitespaces).isEmpty {
             let sug = state.suggestedTags(url: url)
-            if !sug.isEmpty { state.formTags = sug.joined(separator: " ") }
+            if !sug.isEmpty { formTags = sug.joined(separator: " ") }
         }
-        if state.formTitle.trimmingCharacters(in: .whitespaces).isEmpty {
+        if formTitle.trimmingCharacters(in: .whitespaces).isEmpty {
             fetchTitle(url)
         }
     }
 
     private func updateAliasWarning() {
-        let aliases = state.formAliases.split(separator: " ").map { $0.replacingOccurrences(of: "@", with: "") }
+        let aliases = formAliases.split(separator: " ").map { $0.replacingOccurrences(of: "@", with: "") }
         let used = state.aliasesInUse(aliases)
         aliasWarning =
             used.isEmpty
             ? nil
             : "\(used.map { "@\($0)" }.joined(separator: ", ")) already used — will open together"
+    }
+
+    /// Validate alias and tag character sets; set or clear the error strings.
+    private func updateValidation() {
+        // Aliases: word chars (\w), hyphens, dots only.
+        let aliasPattern = try? NSRegularExpression(pattern: "^[\\w.\\-]+$")
+        let badAliases = formAliases.split(separator: " ")
+            .map { $0.replacingOccurrences(of: "@", with: "") }
+            .filter { token in
+                guard !token.isEmpty else { return false }
+                let range = NSRange(token.startIndex..., in: token)
+                return aliasPattern?.firstMatch(in: token, range: range) == nil
+            }
+        aliasValidationError = badAliases.isEmpty
+            ? nil
+            : "Invalid alias\(badAliases.count > 1 ? "es" : "") \"\(badAliases.joined(separator: ", "))\" — use only letters, numbers, hyphens, and dots"
+
+        // Tags: word chars and hyphens only.
+        let tagPattern = try? NSRegularExpression(pattern: "^[\\w\\-]+$")
+        let badTags = formTags.split(separator: " ")
+            .map { $0.replacingOccurrences(of: "#", with: "") }
+            .filter { token in
+                guard !token.isEmpty else { return false }
+                let range = NSRange(token.startIndex..., in: token)
+                return tagPattern?.firstMatch(in: token, range: range) == nil
+            }
+        tagValidationError = badTags.isEmpty
+            ? nil
+            : "Invalid tag\(badTags.count > 1 ? "s" : "") \"\(badTags.joined(separator: ", "))\" — use only letters, numbers, and hyphens"
     }
 
     private func fetchTitle(_ urlStr: String) {
@@ -706,8 +784,8 @@ private struct BookmarkFormView: View {
             let title = Self.extractTitle(buffer)
             await MainActor.run {
                 fetching = false
-                if let title, state.formTitle.trimmingCharacters(in: .whitespaces).isEmpty {
-                    state.formTitle = title
+                if let title, formTitle.trimmingCharacters(in: .whitespaces).isEmpty {
+                    formTitle = title
                 }
             }
         }
