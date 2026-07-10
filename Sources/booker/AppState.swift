@@ -430,6 +430,9 @@ final class AppState: ObservableObject {
             errorMessage = "Could not save: \(error.localizedDescription)"
             return false
         }
+        if editingLine == nil {
+            NSApp.terminate(nil)
+        }
         showForm = false
         query = ""
         reloadBookmarks()
