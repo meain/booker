@@ -582,8 +582,7 @@ private struct BookmarkFormView: View {
                 labeled("Aliases") {
                     field("optional, space separated", text: $formAliases, field: .aliases)
                 }
-                if let av = aliasValidationError { validationError(av) }
-                else if let aw = aliasWarning { warn(aw) }
+                if let av = aliasValidationError { validationError(av) } else if let aw = aliasWarning { warn(aw) }
 
                 if canGenerateShortcuts { githubShortcuts }
 
@@ -626,7 +625,9 @@ private struct BookmarkFormView: View {
             DispatchQueue.main.async { focus = formURL.isEmpty ? .url : .title }
         }
         .onChange(of: formURL) { _ in scheduleEvaluate() }
-        .onChange(of: formAliases) { _ in updateAliasWarning(); updateValidation() }
+        .onChange(of: formAliases) { _ in
+            updateAliasWarning(); updateValidation()
+        }
         .onChange(of: formTags) { _ in updateValidation() }
     }
 
@@ -748,7 +749,8 @@ private struct BookmarkFormView: View {
                 let range = NSRange(token.startIndex..., in: token)
                 return aliasPattern?.firstMatch(in: token, range: range) == nil
             }
-        aliasValidationError = badAliases.isEmpty
+        aliasValidationError =
+            badAliases.isEmpty
             ? nil
             : "Invalid alias\(badAliases.count > 1 ? "es" : "") \"\(badAliases.joined(separator: ", "))\" — use only letters, numbers, hyphens, and dots"
 
@@ -761,7 +763,8 @@ private struct BookmarkFormView: View {
                 let range = NSRange(token.startIndex..., in: token)
                 return tagPattern?.firstMatch(in: token, range: range) == nil
             }
-        tagValidationError = badTags.isEmpty
+        tagValidationError =
+            badTags.isEmpty
             ? nil
             : "Invalid tag\(badTags.count > 1 ? "s" : "") \"\(badTags.joined(separator: ", "))\" — use only letters, numbers, and hyphens"
     }

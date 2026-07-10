@@ -243,7 +243,7 @@ final class AppState: ObservableObject {
     func activate(copy: Bool) {
         if paramMode {
             guard let bm = pendingBookmark else { return }
-            finish(url: Self.fill(bm.url, param: query), sourceURL: bm.url, copy: copy)
+            finish(url: Self.fill(bm.url, param: query), title: bm.title, sourceURL: bm.url, copy: copy)
             return
         }
 
@@ -263,39 +263,42 @@ final class AppState: ObservableObject {
             let bm = result.bookmark
             if let param = result.param {
                 // Inline "@alias value" — value already supplied, open directly.
-                finish(url: Self.fill(bm.url, param: param), sourceURL: bm.url, copy: copy)
+                finish(url: Self.fill(bm.url, param: param), title: bm.title, sourceURL: bm.url, copy: copy)
             } else if bm.needsParam {
                 // Switch to parameter-entry mode instead of opening immediately.
                 pendingBookmark = bm
                 paramMode = true
                 query = ""
             } else {
-                finish(url: bm.url, sourceURL: bm.url, copy: copy)
+                finish(url: bm.url, title: bm.title, sourceURL: bm.url, copy: copy)
             }
         }
     }
 
     /// Open every bookmark in a shared-alias group (skips %s ones), then quit.
     private func openAll(_ bms: [Bookmark], copy: Bool) {
-        let urls = bms.filter { !$0.needsParam }.map { $0.url }
+        let usable = bms.filter { !$0.needsParam }
         if copy {
             let pb = NSPasteboard.general
             pb.clearContents()
-            pb.setString(urls.joined(separator: "\n"), forType: .string)
+            let html = usable.map { Self.htmlLink(url: $0.url, title: $0.title) }.joined(separator: "<br>")
+            pb.setString(html, forType: .html)
+            pb.setString(usable.map { $0.url }.joined(separator: "\n"), forType: .string)
         } else {
-            for u in urls {
-                frecency.record(url: u)
-                if let url = URL(string: u) { NSWorkspace.shared.open(url) }
+            for bm in usable {
+                frecency.record(url: bm.url)
+                if let url = URL(string: bm.url) { NSWorkspace.shared.open(url) }
             }
         }
         NSApp.terminate(nil)
     }
 
-    private func finish(url: String, sourceURL: String, copy: Bool) {
+    private func finish(url: String, title: String, sourceURL: String, copy: Bool) {
         frecency.record(url: sourceURL)
         if copy {
             let pb = NSPasteboard.general
             pb.clearContents()
+            pb.setString(Self.htmlLink(url: url, title: title), forType: .html)
             pb.setString(url, forType: .string)
         } else if let u = URL(string: url)
             ?? url.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed).flatMap(URL.init(string:))
@@ -303,6 +306,18 @@ final class AppState: ObservableObject {
             NSWorkspace.shared.open(u)
         }
         NSApp.terminate(nil)
+    }
+
+    /// Builds an `<a>` tag for the HTML pasteboard representation so pasting
+    /// into rich-text targets (Mail, Notes, Teams, …) yields a titled link.
+    private static func htmlLink(url: String, title: String) -> String {
+        func escape(_ s: String) -> String {
+            s.replacingOccurrences(of: "&", with: "&amp;")
+                .replacingOccurrences(of: "<", with: "&lt;")
+                .replacingOccurrences(of: ">", with: "&gt;")
+                .replacingOccurrences(of: "\"", with: "&quot;")
+        }
+        return "<a href=\"\(escape(url))\">\(escape(title))</a>"
     }
 
     /// Escape pressed. Backs out of whatever mode is active, else quits.
@@ -386,9 +401,10 @@ final class AppState: ObservableObject {
     /// Save the form. Title and URL are required. Appends, or rewrites the line
     /// when editing. Returns false if invalid.
     @discardableResult
-    func saveBookmark(url formURL: String, title formTitle: String, tags formTags: String,
-        aliases formAliases: String, generate formGenerate: Bool, genEnabled: Set<String>) -> Bool
-    {
+    func saveBookmark(
+        url formURL: String, title formTitle: String, tags formTags: String,
+        aliases formAliases: String, generate formGenerate: Bool, genEnabled: Set<String>
+    ) -> Bool {
         let title = formTitle.trimmingCharacters(in: .whitespaces)
         let url = formURL.trimmingCharacters(in: .whitespaces)
         guard !title.isEmpty, !url.isEmpty else { return false }
