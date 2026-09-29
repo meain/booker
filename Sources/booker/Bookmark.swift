@@ -30,6 +30,13 @@ struct Bookmark: Identifiable {
     let tags: [String]
     let aliases: [String]
 
+    // Lowercased, pre-split search keys, built once at load so the matcher
+    // doesn't re-lowercase / re-split every field on every keystroke.
+    let titleKey: SearchKey
+    let urlKey: SearchKey
+    let tagKeys: [SearchKey]
+    let aliasKeys: [SearchKey]
+
     var needsParam: Bool { url.contains("%s") }
 
     init(id: Int, line: Int, title: String, url: String, tags: [String], aliases: [String]) {
@@ -39,6 +46,10 @@ struct Bookmark: Identifiable {
         self.url = url
         self.tags = tags
         self.aliases = aliases
+        self.titleKey = SearchKey(title)
+        self.urlKey = SearchKey(url)
+        self.tagKeys = tags.map(SearchKey.init)
+        self.aliasKeys = aliases.map(SearchKey.init)
     }
 }
 

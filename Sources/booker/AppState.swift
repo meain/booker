@@ -150,7 +150,8 @@ final class AppState: ObservableObject {
         var q = query.trimmingCharacters(in: .whitespaces).lowercased()
         if q.hasPrefix("@") { q.removeFirst() }
         guard !q.isEmpty else { return nil }
-        let matches = bookmarks.filter { $0.aliases.contains { $0.lowercased() == q } }
+        let qc = Array(q)
+        let matches = bookmarks.filter { $0.aliasKeys.contains { $0.chars == qc } }
         return matches.count >= 2 ? (q, matches) : nil
     }
 
