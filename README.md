@@ -130,7 +130,8 @@ Settings — bookmarks file location, toggles, highlight colour, and caches:
 | `⌘E` | edit selected bookmark |
 | `⌘⌫` | delete selected bookmark (confirm with `↩`) |
 | `⌘,` | open / close settings |
-| `Esc` | close form/settings · back out of param mode · quit |
+| `Esc` | close form/settings · back out of param mode · hide |
+| `⌘Q` | quit |
 
 ## Build
 
@@ -149,15 +150,16 @@ open ./Booker.app
 
 ## Wiring up a hotkey
 
-Booker launches fresh, grabs focus, and quits on select/escape, so it works
-well as a hotkey target. Point your launcher at the `.app` bundle (`open -n`
-forces a fresh instance each time):
+Booker stays resident: select/escape (or clicking away) hides the window
+instead of quitting, and launching it again re-shows it instantly with the
+bookmarks file re-read. `⌘Q` quits for real. Point your launcher at the `.app`
+bundle — use plain `open` (not `open -n`, which forces a slow fresh instance):
 
 - **[Hammerspoon](https://www.hammerspoon.org/)**:
   ```lua
   hs.hotkey.bind({"cmd", "shift"}, "b", function()
-    hs.execute("open -n /path/to/booker/Booker.app")
+    hs.application.launchOrFocusByBundleID("com.meain.booker")
   end)
   ```
-- **[skhd](https://github.com/koekeishiya/skhd)**: `cmd + shift - b : open -n /path/to/booker/Booker.app`
-- **[Raycast](https://www.raycast.com/) / [Alfred](https://www.alfredapp.com/)**: add a script/hotkey that runs `open -n .../Booker.app`.
+- **[skhd](https://github.com/koekeishiya/skhd)**: `cmd + shift - b : open /path/to/booker/Booker.app`
+- **[Raycast](https://www.raycast.com/) / [Alfred](https://www.alfredapp.com/)**: add a script/hotkey that runs `open .../Booker.app`.

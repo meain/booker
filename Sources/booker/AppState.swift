@@ -198,10 +198,38 @@ final class AppState: ObservableObject {
         reloadBookmarks()
     }
 
-    private func reloadBookmarks() {
+    /// Public so the app delegate can re-read the file on every show — `,bm`
+    /// may have edited it while booker sat hidden.
+    func reloadBookmarks() {
         bookmarks = BookmarkParser.load()
         bookmarkCount = bookmarks.count
         refilter()
+    }
+
+    // MARK: - Session lifecycle (booker stays resident; see AppDelegate)
+
+    /// Set by the app delegate: hides the window instead of quitting.
+    var onDismiss: (() -> Void)?
+
+    /// Ends the session (select/copy/Esc/save). Hides rather than quits so the
+    /// next hotkey press only has to re-show the window.
+    private func dismiss() {
+        onDismiss?()
+    }
+
+    /// Clears any mode left over from the last session. Called on hide, so the
+    /// overlay-size restore happens while the window is offscreen.
+    func resetSession() {
+        showForm = false
+        showSettings = false
+        frecencyCleared = false
+        faviconsCleared = false
+        pendingDeleteID = nil
+        errorMessage = nil
+        paramMode = false
+        pendingBookmark = nil
+        query = ""
+        selected = 0
     }
 
     func resetFrecency() {
@@ -276,7 +304,7 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Open every bookmark in a shared-alias group (skips %s ones), then quit.
+    /// Open every bookmark in a shared-alias group (skips %s ones), then hide.
     private func openAll(_ bms: [Bookmark], copy: Bool) {
         let usable = bms.filter { !$0.needsParam }
         if copy {
@@ -291,7 +319,7 @@ final class AppState: ObservableObject {
                 if let url = URL(string: bm.url) { NSWorkspace.shared.open(url) }
             }
         }
-        NSApp.terminate(nil)
+        dismiss()
     }
 
     private func finish(url: String, title: String, sourceURL: String, copy: Bool) {
@@ -306,7 +334,7 @@ final class AppState: ObservableObject {
         {
             NSWorkspace.shared.open(u)
         }
-        NSApp.terminate(nil)
+        dismiss()
     }
 
     /// Builds an `<a>` tag for the HTML pasteboard representation so pasting
@@ -321,7 +349,7 @@ final class AppState: ObservableObject {
         return "<a href=\"\(escape(url))\">\(escape(title))</a>"
     }
 
-    /// Escape pressed. Backs out of whatever mode is active, else quits.
+    /// Escape pressed. Backs out of whatever mode is active, else hides.
     func cancel() {
         if showForm {
             closeForm()
@@ -335,7 +363,7 @@ final class AppState: ObservableObject {
             query = ""
             refilter()
         } else {
-            NSApp.terminate(nil)
+            dismiss()
         }
     }
 
@@ -448,7 +476,7 @@ final class AppState: ObservableObject {
             return false
         }
         if editingLine == nil {
-            NSApp.terminate(nil)
+            dismiss()
         }
         showForm = false
         query = ""

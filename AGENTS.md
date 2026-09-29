@@ -38,7 +38,7 @@ live (`AppState.setBookmarkFile` → `reloadBookmarks`).
 
 `↩` open · `⌘↩` copy URL (also Save in the form) · `↑↓` / `Ctrl-p`/`Ctrl-n` nav ·
 `⌘N` add · `⌘E` edit selected · `⌘⌫` delete selected (confirm with `↩`) ·
-`⌘,` settings · `Esc` close overlay / back out of `%s` prompt / quit.
+`⌘,` settings · `Esc` close overlay / back out of `%s` prompt / hide · `⌘Q` quit.
 
 ## Build & run
 
@@ -120,6 +120,11 @@ produces no PNG, the fixed `sleep` fired before render; retry with more delay.
 
 ## Hotkey
 
-Launches fresh, grabs focus, quits on select/escape. Point a launcher at the
-app: `open -n .../Booker.app` (skhd/Raycast/Alfred). `open -n` forces a fresh
-instance.
+Stays resident: select/escape/click-away hides (`window.orderOut` +
+`NSApp.hide`) instead of quitting, since a fresh launch is ~450ms of fixed
+AppKit/SwiftUI cost vs ~100ms to re-show. `AppState` calls `dismiss()` →
+`AppDelegate.hide()`, which also runs `resetSession()` while offscreen; re-show
+(`applicationDidBecomeActive` / `applicationShouldHandleReopen`) re-reads the
+file (`,bm` may have edited it). `⌘Q` really quits. Launch with plain `open` or
+`hs.application.launchOrFocusByBundleID("com.meain.booker")` — `open -n` spawns
+a new instance and defeats this. `BOOKER_SHOT` runs skip the click-away hide.

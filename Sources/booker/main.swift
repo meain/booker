@@ -9,8 +9,15 @@ final class KeyableWindow: NSWindow {
     override var canBecomeMain: Bool { true }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+/// Booker stays resident: finishing a session hides the window (and the app,
+/// handing focus back) instead of quitting, so the next launcher hit just
+/// re-shows it (~100ms) rather than paying a fresh process launch (~450ms).
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var window: NSWindow!
+    /// Screenshot runs must not auto-hide when the window loses key.
+    private let shotMode = ProcessInfo.processInfo.environment["BOOKER_SHOT"] != nil
+    /// Guards windowDidResignKey while we're hiding ourselves.
+    private var isHiding = false
     private let state: AppState
     private var monitor: Any?
     private var cancellables = Set<AnyCancellable>()
@@ -25,7 +32,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let shotMode = ProcessInfo.processInfo.environment["BOOKER_SHOT"] != nil
         let content = PickerView(state: state, favicons: state.favicons, screenshotMode: shotMode)
         let hosting = NSHostingView(rootView: content)
 
@@ -51,6 +57,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             positionWindow()
         }
         window.setFrameAutosaveName(autosave)
+        window.delegate = self
+        state.onDismiss = { [weak self] in self?.hide() }
 
         installEditMenu()
         installKeyMonitor()
@@ -76,6 +84,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
             }
         }
+    }
+
+    /// Reopen of a running instance (`open`, Dock-style relaunch).
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        show()
+        return false
+    }
+
+    /// `launchOrFocusByBundleID` on a hidden instance just activates it; the
+    /// window was ordered out, so bring it back here.
+    func applicationDidBecomeActive(_ notification: Notification) {
+        if let window, !window.isVisible { show() }
+    }
+
+    /// Clicking away dismisses, like Spotlight. Not while an overlay is open —
+    /// settings' Choose… panel takes key, and the form may be mid-edit.
+    func windowDidResignKey(_ notification: Notification) {
+        guard !isHiding, !shotMode, !state.showForm, !state.showSettings else { return }
+        hide()
+    }
+
+    private func show() {
+        state.reloadBookmarks()
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    private func hide() {
+        isHiding = true
+        window.orderOut(nil)
+        NSApp.hide(nil)  // hands focus back to the previously active app
+        // Reset while offscreen so the overlay-size restore isn't visible on show.
+        state.resetSession()
+        isHiding = false
     }
 
     /// Center the window on the screen that currently has the mouse.
@@ -146,6 +188,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self = self else { return event }
             let cmd = event.modifierFlags.contains(.command)
             let ctrl = event.modifierFlags.contains(.control)
+
+            // ⌘Q really quits (everything else just hides).
+            if cmd && event.keyCode == 12 {
+                NSApp.terminate(nil)
+                return nil
+            }
 
             // In the add/edit form, only Escape is intercepted; SwiftUI handles
             // typing, Tab, and the ⌘↩ Save shortcut.
