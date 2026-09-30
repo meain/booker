@@ -93,6 +93,8 @@ booker can modify the file directly:
   bookmarks on the same domain, warns on duplicate URLs, shows the favicon.
 - **⌘E** — edit the selected bookmark (same form, pre-filled).
 - **⌘⌫** — delete the selected bookmark (confirm with `↩`).
+- **⌘I** — usage stats for the selected bookmark: open count, last opened,
+  share of all opens, frecency rank/score. `↩` opens it, `Esc` closes.
 
 Title and URL are required. Edits rewrite exactly that one line; comments, blank
 lines, and everything else in the file are preserved.

@@ -11,6 +11,19 @@ struct FormSeed {
     static let empty = FormSeed(url: "", title: "", tags: "", aliases: "")
 }
 
+/// Usage stats for one bookmark, shown by the ⌘I stats view.
+struct BookmarkStats {
+    let bookmark: Bookmark
+    let count: Int
+    let last: Date?
+    let score: Double
+    /// 1-based position among opened bookmarks by frecency score; nil if never opened.
+    let rank: Int?
+    let openedCount: Int
+    /// This bookmark's share of all recorded opens (0...1).
+    let share: Double
+}
+
 /// A row in the results list: a matched bookmark, an "open all" group for a
 /// shared alias, or an "add this URL" affordance.
 enum ResultRow: Identifiable {
@@ -50,6 +63,9 @@ final class AppState: ObservableObject {
 
     // Delete confirmation: id of the bookmark awaiting a confirm keypress.
     @Published var pendingDeleteID: Int?
+
+    // Stats view (⌘I) for the selected bookmark.
+    @Published private(set) var stats: BookmarkStats?
 
     // Measured natural height of the add/edit form, so the window can fit it.
     @Published var formHeight: CGFloat = 0
@@ -222,6 +238,7 @@ final class AppState: ObservableObject {
     func resetSession() {
         showForm = false
         showSettings = false
+        stats = nil
         frecencyCleared = false
         faviconsCleared = false
         pendingDeleteID = nil
@@ -349,10 +366,44 @@ final class AppState: ObservableObject {
         return "<a href=\"\(escape(url))\">\(escape(title))</a>"
     }
 
+    // MARK: - Stats
+
+    /// Toggle the stats view for the selected bookmark.
+    func toggleStats() {
+        if stats != nil {
+            stats = nil
+            return
+        }
+        guard let bm = selectedBookmark else { return }
+        pendingDeleteID = nil
+        let urls = Set(bookmarks.map { $0.url })
+        let usages = urls.compactMap { url in frecency.usage(for: url).map { (url, $0.count) } }
+        let total = usages.reduce(0) { $0 + $1.1 }
+        let usage = frecency.usage(for: bm.url)
+        let score = frecency.score(for: bm.url)
+        let rank = usage.map { _ in usages.filter { frecency.score(for: $0.0) > score }.count + 1 }
+        stats = BookmarkStats(
+            bookmark: bm,
+            count: usage?.count ?? 0,
+            last: usage?.last,
+            score: score,
+            rank: rank,
+            openedCount: usages.count,
+            share: total > 0 ? Double(usage?.count ?? 0) / Double(total) : 0)
+    }
+
+    /// ↩ from the stats view: close it and open the bookmark it describes.
+    func activateFromStats(copy: Bool) {
+        stats = nil
+        activate(copy: copy)
+    }
+
     /// Escape pressed. Backs out of whatever mode is active, else hides.
     func cancel() {
         if showForm {
             closeForm()
+        } else if stats != nil {
+            stats = nil
         } else if pendingDeleteID != nil {
             pendingDeleteID = nil
         } else if showSettings {

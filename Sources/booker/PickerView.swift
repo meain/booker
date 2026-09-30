@@ -46,6 +46,10 @@ struct PickerView: View {
                 BookmarkFormView(state: state)
             } else if state.showSettings {
                 SettingsView(state: state)
+            } else if let stats = state.stats {
+                StatsView(
+                    stats: stats,
+                    favicon: state.showFavicons ? favicons.image(forURL: stats.bookmark.url) : nil)
             } else {
                 VStack(spacing: 0) {
                     searchField
@@ -303,6 +307,91 @@ private struct Row: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(pendingDelete ? Color.red.opacity(0.9) : (selected ? Color.accentColor : Color.clear))
         )
+    }
+}
+
+/// ⌘I view: what the frecency store knows about the selected bookmark.
+private struct StatsView: View {
+    let stats: BookmarkStats
+    let favicon: NSImage?
+
+    private var lastOpened: String {
+        guard let last = stats.last else { return "Never" }
+        let rel = RelativeDateTimeFormatter()
+        rel.unitsStyle = .full
+        let relative = rel.localizedString(for: last, relativeTo: Date())
+        return "\(relative)  ·  \(last.formatted(date: .abbreviated, time: .shortened))"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "chart.bar")
+                    .foregroundStyle(.secondary)
+                Text("Stats")
+                    .font(.system(size: 18, weight: .semibold))
+                Spacer()
+                Text("↩ open  ·  ⌘I  or  Esc to close")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(16)
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(alignment: .top, spacing: 10) {
+                        if let favicon = favicon {
+                            Image(nsImage: favicon)
+                                .resizable()
+                                .interpolation(.high)
+                                .frame(width: 20, height: 20)
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(stats.bookmark.title)
+                                .font(.system(size: 15, weight: .medium))
+                            Text(stats.bookmark.url)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                            let meta =
+                                stats.bookmark.aliases.map { "@\($0)" } + stats.bookmark.tags.map { "#\($0)" }
+                            if !meta.isEmpty {
+                                Text(meta.joined(separator: "  "))
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    stat("Opened", stats.count == 1 ? "1 time" : "\(stats.count) times")
+                    stat("Last opened", lastOpened)
+                    stat(
+                        "Share of opens",
+                        stats.count > 0 ? String(format: "%.1f%%", stats.share * 100) : "—")
+                    stat(
+                        "Rank",
+                        stats.rank.map { "#\($0) of \(stats.openedCount) opened bookmarks" } ?? "—")
+                    stat("Frecency score", String(format: "%.2f", stats.score))
+                    stat("Line in file", "\(stats.bookmark.line + 1)")
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func stat(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .frame(width: 120, alignment: .leading)
+            Text(value)
+                .font(.system(size: 14))
+        }
     }
 }
 

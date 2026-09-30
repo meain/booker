@@ -201,6 +201,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 if event.keyCode == 53 { self.state.cancel(); return nil }  // Escape
                 return event
             }
+            // Stats view: ⌘I/Esc close, ↩ opens (⌘↩ copies) the bookmark.
+            if self.state.stats != nil {
+                switch event.keyCode {
+                case 34 where cmd, 53: self.state.cancel()
+                case 36, 76: self.state.activateFromStats(copy: cmd)
+                default: break
+                }
+                return nil
+            }
             // ⌘, toggles settings from anywhere.
             if cmd && event.keyCode == 43 {
                 self.state.toggleSettings()
@@ -215,7 +224,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
                 return event
             }
-            // ⌘N add, ⌘E edit selected, ⌘⌫ delete selected.
+            // ⌘I stats, ⌘N add, ⌘E edit selected, ⌘⌫ delete selected.
+            if cmd && event.keyCode == 34 { self.state.toggleStats(); return nil }
             if cmd && event.keyCode == 45 { self.state.openAddForm(seed: self.state.query); return nil }
             if cmd && event.keyCode == 14 { self.state.openEditForm(); return nil }
             if cmd && event.keyCode == 51 { self.state.requestDeleteSelected(); return nil }

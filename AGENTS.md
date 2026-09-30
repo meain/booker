@@ -38,6 +38,7 @@ live (`AppState.setBookmarkFile` → `reloadBookmarks`).
 
 `↩` open · `⌘↩` copy URL (also Save in the form) · `↑↓` / `Ctrl-p`/`Ctrl-n` nav ·
 `⌘N` add · `⌘E` edit selected · `⌘⌫` delete selected (confirm with `↩`) ·
+`⌘I` stats for selected (`AppState.stats` / `StatsView`, read-only from `Frecency.usage`) ·
 `⌘,` settings · `Esc` close overlay / back out of `%s` prompt / hide · `⌘Q` quit.
 
 ## Build & run

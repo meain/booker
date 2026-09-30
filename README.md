@@ -129,6 +129,7 @@ Settings — bookmarks file location, toggles, highlight colour, and caches:
 | `⌘N` | add a bookmark |
 | `⌘E` | edit selected bookmark |
 | `⌘⌫` | delete selected bookmark (confirm with `↩`) |
+| `⌘I` | usage stats for selected bookmark |
 | `⌘,` | open / close settings |
 | `Esc` | close form/settings · back out of param mode · hide |
 | `⌘Q` | quit |

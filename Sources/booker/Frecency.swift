@@ -35,6 +35,12 @@ final class Frecency {
         return Double(e.count) + recencyBonus
     }
 
+    /// Recorded usage for a URL (nil if never opened), for the stats view.
+    func usage(for url: String) -> (count: Int, last: Date)? {
+        guard let e = entries[url] else { return nil }
+        return (e.count, Date(timeIntervalSince1970: e.last))
+    }
+
     /// Record that a URL was opened, and persist immediately.
     func record(url: String) {
         var e = entries[url] ?? Entry(count: 0, last: 0)
