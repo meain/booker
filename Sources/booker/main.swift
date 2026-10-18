@@ -111,6 +111,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
     }
 
+    /// Scroll the stats view's `NSScrollView` by `dy` points (positive = down).
+    private func scrollStats(by dy: CGFloat) {
+        func findScroll(_ v: NSView) -> NSScrollView? {
+            if let s = v as? NSScrollView { return s }
+            for sub in v.subviews { if let s = findScroll(sub) { return s } }
+            return nil
+        }
+        guard let content = window.contentView, let scroll = findScroll(content),
+            let doc = scroll.documentView
+        else { return }
+        let clip = scroll.contentView
+        let maxY = max(0, doc.frame.height - clip.bounds.height)
+        let sign: CGFloat = doc.isFlipped ? 1 : -1
+        var y = clip.bounds.origin.y + sign * dy
+        y = min(max(y, 0), maxY)
+        clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: y))
+        scroll.reflectScrolledClipView(clip)
+    }
+
     private func hide() {
         isHiding = true
         window.orderOut(nil)
@@ -206,6 +225,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 switch event.keyCode {
                 case 34 where cmd, 53: self.state.cancel()
                 case 36, 76: self.state.activateFromStats(copy: cmd)
+                case 38, 125: self.scrollStats(by: 40)  // j / ↓
+                case 40, 126: self.scrollStats(by: -40)  // k / ↑
                 default: break
                 }
                 return nil
