@@ -86,7 +86,12 @@ struct PickerView: View {
                 .textFieldStyle(.plain)
                 .font(.system(size: 20))
                 .focused($searchFocused)
-                .onAppear { searchFocused = true }
+                .onAppear {
+                    // Async: setting focus before the field is mounted (e.g. when
+                    // returning from settings/form/stats) is dropped.
+                    searchFocused = true
+                    DispatchQueue.main.async { searchFocused = true }
+                }
             Button(action: { state.toggleSettings() }) {
                 Image(systemName: "gearshape")
                     .foregroundStyle(.secondary)
