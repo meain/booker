@@ -29,6 +29,81 @@ Type the alias followed by the value — e.g. `w Bookmark` — and the bookmark
 shows up with the URL already filled in (`en.wikipedia.org/wiki/Bookmark`), ready
 to open. Or pick it with no value to get prompted.
 
+### Beyond http links
+
+The target is handed to macOS as-is (`NSWorkspace.open`), so any URL scheme the
+system can open works, including `%s` parameters. This is handy for jumping
+straight into native apps:
+
+```
+- [Obsidian Search](obsidian://search?vault=notes&query=%s) #notes @os
+- [Teams channel](msteams://teams.microsoft.com/l/channel/<id>/general?groupId=<gid>&tenantId=<tid>) #work @tc
+- [Slack channel](slack://channel?team=<TEAM_ID>&id=<CHANNEL_ID>) #work @sl
+- [Spotify search](spotify:search:%s) #music @sp
+- [Open in VS Code](vscode://file/Users/me/dev/project) #dev @code
+- [Project folder](file:///Users/me/dev/project) #dev @proj
+- [Email someone](mailto:someone@example.com?subject=%s) @mail
+- [Run a Shortcut](shortcuts://run-shortcut?name=Morning%20routine) @morning
+```
+
+More ideas that work the same way:
+
+```
+- [Maps search](https://www.google.com/maps/search/?api=1&query=%s) #maps @maps
+- [Maps directions](https://www.google.com/maps/dir/?api=1&destination=%s&travelmode=driving) #maps @dir
+- [Dictionary](dict://%s) #reference @dict
+- [Dev folder](file:///Users/me/dev) #folder @dev
+- [Software Update settings](x-apple.systempreferences:com.apple.Software-Update-Settings.extension) #system @updates
+- [Obsidian new note](obsidian://new?vault=notes&name=%s) #notes @on
+- [Obsidian daily note](obsidian://daily?vault=notes) #notes @od
+```
+
+- `dir` routes from your current location to the typed destination (change
+  `travelmode` to `walking` or `transit`).
+- `obsidian://daily` needs Obsidian's Daily Notes plugin enabled.
+- `x-apple.systempreferences:` pane IDs vary by macOS version.
+
+#### Shortcuts for anything else
+
+macOS has no URL for things like toggling Do Not Disturb, but a Shortcut can do
+it, and `shortcuts://run-shortcut?name=<name>` runs one by name. Build the
+Shortcut in the Shortcuts app (for example "Set Focus" → Do Not Disturb, on for
+an hour), then link it. Use one bookmark per direction:
+
+```
+- [Focus 1h](shortcuts://run-shortcut?name=Focus%201h) #system @focus
+- [Focus off](shortcuts://run-shortcut?name=Focus%20Off) #system @focusoff
+```
+
+A Shortcut can also run a shell script, which turns a bookmark into a general
+launcher. That needs **Shortcuts → Settings → Advanced → Allow Running Scripts**
+to be enabled.
+
+#### Running shell commands
+
+Any executable script can be a bookmark. Point a `file://` link at it and macOS
+opens it in Terminal, which runs it:
+
+```
+- [Sync photos](file:///Users/me/bin/sync-photos) #scripts @sync
+- [Start work session](file:///Users/me/bin/work-session.command) #scripts @work
+```
+
+To use it:
+
+- Make the script executable (`chmod +x`) and give it a shebang (`#!/bin/sh`).
+- Put the command, with any arguments baked in, inside the script. There is no
+  `%s` support for this, so one script per command.
+- Use the full path to the script, and to anything it calls if `PATH` might
+  differ from your interactive shell.
+
+A Terminal window opens each time. To have it close by itself, set **Terminal →
+Settings → Profiles → Shell → When the shell exits** to **Close if the shell
+exited cleanly**. This closes the window only; it doesn't quit Terminal.
+
+Favicons and page-title fetching only apply to `http(s)` links; other schemes
+show a plain row.
+
 ## Features
 
 - **Fuzzy search** over titles, tags, and aliases. In general search the
@@ -89,6 +164,13 @@ to open. Or pick it with no value to get prompted.
   - [npm](https://www.npmjs.com/search?q=%s) #dev @npm
   ```
   `w Ada Lovelace` → the article; `npm zod` → the search.
+
+- **App launcher** — non-http schemes open the native app directly:
+  ```
+  - [Notes search](obsidian://search?vault=notes&query=%s) #notes @os
+  - [Team channel](slack://channel?team=T0123456&id=C0123456) #work @sl
+  ```
+  `os meeting` → Obsidian searching for "meeting"; `@sl` → straight into the channel.
 
 - **"Open all" a group** — one alias on several bookmarks opens them together:
   ```
